@@ -88,3 +88,16 @@ docker compose up -d --build
 python -m app.evals.run_eval --dataset ../evals/golden_qa.jsonl
 python -m app.evals.run_eval --dataset ../evals/golden_qa.jsonl --enable-hybrid-search --enable-rerank
 ```
+## 样例知识库
+
+`sample_docs/` 提供了一组可直接上传或导入的虚构企业文档，覆盖员工手册、报销制度、休假制度、IT 服务、产品 FAQ、客服工单、销售合同和数据安全规范。它们用于本地演示、RAG 评测和面试讲解，不包含真实公司数据。
+
+可以通过管理员界面逐个上传，也可以使用脚本批量导入：
+
+```bash
+docker compose run --rm \
+  -v "./sample_docs:/app/sample_docs" \
+  backend python -m app.evals.ingest_sample_docs --sample-dir /app/sample_docs
+```
+
+评测集位于 `evals/golden_qa.jsonl`，当前包含 37 条样例问题。

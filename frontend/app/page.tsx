@@ -64,6 +64,15 @@ const defaultSettings: AppSettings = {
   },
 };
 
+const exampleQuestions = [
+  "出差报销需要提交哪些材料？",
+  "云舟知识库助手支持哪些文档格式？",
+  "P0 工单需要多久响应？",
+  "API Key 可以写进 README 或工单评论吗？",
+  "折扣超过 35% 的报价需要谁审批？",
+  "公司年会抽奖一等奖是什么？",
+];
+
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     processing: "处理中",
@@ -475,10 +484,24 @@ export default function HomePage() {
                   {chatError ?? chatStatus}
                 </div>
               ) : null}
+              <div className="mb-3 flex flex-wrap gap-2">
+                {exampleQuestions.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className="rounded-md border border-moss/15 bg-linen/60 px-2.5 py-1.5 text-xs text-moss transition hover:border-moss/35 hover:bg-linen disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isAsking}
+                    onClick={() => setQuestion(item)}
+                    title="点击填入示例问题"
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
               <form className="flex gap-3" onSubmit={handleAsk}>
                 <textarea
                   className="min-h-16 flex-1 resize-none rounded-md border border-moss/15 bg-white px-3 py-2 text-sm outline-none focus:border-moss"
-                  placeholder="输入你的问题，例如：出差报销需要提交哪些材料？"
+                  placeholder="输入你的问题，或点击上方示例问题快速体验检索、拒答和引用来源。"
                   value={question}
                   onChange={(event) => setQuestion(event.target.value)}
                 />

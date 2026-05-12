@@ -1,19 +1,42 @@
 # RAG 基础评测集
 
-`golden_qa.jsonl` 用于验证 RAG 检索链路，不额外调用生成模型。
+`golden_qa.jsonl` 用于验证 RAG 检索链路，不额外调用生成模型。当前包含 37 条样例，覆盖员工手册、报销制度、休假制度、IT 服务、产品 FAQ、客服工单、销售合同、数据安全和拒答问题。
 
-当前指标：
+## 指标
 
 - `retrieval_hit_rate`：期望来源文档或章节是否出现在 TopK 检索结果中。
 - `refusal_accuracy`：应该拒答的问题是否被阈值策略判定为拒答。
 - `keyword_coverage_avg`：期望关键词在检索上下文中的覆盖比例。
 - `avg_top1_score`：Top1 相似度平均值。
 
-运行方式：
+## 准备样例知识库
+
+如果数据库还没有导入 `sample_docs`，可以先运行：
 
 ```bash
-cd backend
-python -m app.evals.run_eval --dataset ../evals/golden_qa.jsonl
+docker compose run --rm `
+  -v "D:\03_Work\04_NewWorks\我的AI新工作\enterprise-rag-assistant\sample_docs:/app/sample_docs" `
+  backend python -m app.evals.ingest_sample_docs --sample-dir /app/sample_docs
 ```
 
-如果在本机直连 Docker Compose 暴露的 PostgreSQL，脚本会自动把 `.env` 中的数据库主机 `postgres` 改为 `localhost`。
+该命令会复用正式文档入库流程，因此需要 `.env` 中已经配置 `DASHSCOPE_API_KEY`。
+
+## 运行评测
+
+纯向量检索：
+
+```bash
+docker compose run --rm `
+  -v "D:\03_Work\04_NewWorks\我的AI新工作\enterprise-rag-assistant\evals:/app/evals" `
+  -v "D:\03_Work\04_NewWorks\我的AI新工作\enterprise-rag-assistant\backend\app\evals:/app/app/evals" `
+  backend python -m app.evals.run_eval --dataset /app/evals/golden_qa.jsonl --disable-hybrid-search --disable-rerank
+```
+
+Hybrid Search + 轻量 Rerank：
+
+```bash
+docker compose run --rm `
+  -v "D:\03_Work\04_NewWorks\我的AI新工作\enterprise-rag-assistant\evals:/app/evals" `
+  -v "D:\03_Work\04_NewWorks\我的AI新工作\enterprise-rag-assistant\backend\app\evals:/app/app/evals" `
+  backend python -m app.evals.run_eval --dataset /app/evals/golden_qa.jsonl --enable-hybrid-search --enable-rerank
+```

@@ -5,6 +5,33 @@
 {"question":"出差结束后多久内要提交报销申请？","expected_sources":["报销制度"],"expected_sections":["差旅报销"],"expected_keywords":["7 个工作日","提交报销申请"],"expected_refusal":false,"category":"报销制度"}
 {"question":"市内交通费用报销需要说明什么？","expected_sources":["报销制度"],"expected_sections":["交通报销"],"expected_keywords":["出行事由","起止地点","关联客户","项目"],"expected_refusal":false,"category":"报销制度"}
 {"question":"餐费报销需要补充哪些说明？","expected_sources":["报销制度"],"expected_sections":["餐补规则"],"expected_keywords":["业务背景","对应发票","客户拜访","项目加班"],"expected_refusal":false,"category":"报销制度"}
+{"question":"员工转正后年假有多少天？","expected_sources":["休假制度"],"expected_sections":["年假规则"],"expected_keywords":["转正","5 天年假","10 天年假","15 天年假"],"expected_refusal":false,"category":"休假制度"}
+{"question":"连续病假超过两天需要提供什么材料？","expected_sources":["休假制度"],"expected_sections":["病假申请"],"expected_keywords":["连续病假超过 2 个工作日","医院诊断证明","门诊记录"],"expected_refusal":false,"category":"休假制度"}
+{"question":"调休额度多久会失效？","expected_sources":["休假制度"],"expected_sections":["调休规则"],"expected_keywords":["90 天内使用","逾期未使用","自动失效"],"expected_refusal":false,"category":"休假制度"}
+{"question":"婚假申请需要提前多久提交？","expected_sources":["休假制度"],"expected_sections":["婚假与产假"],"expected_keywords":["提前 5 个工作日","结婚证明"],"expected_refusal":false,"category":"休假制度"}
+{"question":"新员工的企业邮箱和 VPN 什么时候开通？","expected_sources":["IT服务指南"],"expected_sections":["账号开通"],"expected_keywords":["入职当天 12:00 前","企业邮箱","VPN","代码仓库"],"expected_refusal":false,"category":"IT服务指南"}
+{"question":"忘记密码应该怎么处理？","expected_sources":["IT服务指南"],"expected_sections":["密码重置"],"expected_keywords":["IT 服务台","账号与权限","核验员工身份","立即修改"],"expected_refusal":false,"category":"IT服务指南"}
+{"question":"远程访问内部系统必须使用什么？","expected_sources":["IT服务指南"],"expected_sections":["VPN 使用"],"expected_keywords":["公司 VPN","受信任设备","多因素认证"],"expected_refusal":false,"category":"IT服务指南"}
+{"question":"设备报修工单需要填写哪些信息？","expected_sources":["IT服务指南"],"expected_sections":["设备报修"],"expected_keywords":["设备编号","故障现象","影响范围","联系方式"],"expected_refusal":false,"category":"IT服务指南"}
+{"question":"云舟知识库助手支持哪些文档格式？","expected_sources":["产品FAQ"],"expected_sections":["支持的文档格式"],"expected_keywords":["PDF","DOCX","Markdown","TXT"],"expected_refusal":false,"category":"产品FAQ"}
+{"question":"系统回答时右侧会展示哪些引用来源信息？","expected_sources":["产品FAQ"],"expected_sections":["引用来源"],"expected_keywords":["文档标题","章节路径","片段摘要","相似度分数"],"expected_refusal":false,"category":"产品FAQ"}
+{"question":"为什么系统会严格拒答？","expected_sources":["产品FAQ"],"expected_sections":["严格拒答"],"expected_keywords":["Top1 相似度","配置阈值","降低模型幻觉","调用成本"],"expected_refusal":false,"category":"产品FAQ"}
+{"question":"游客能不能上传文档或修改知识库？","expected_sources":["产品FAQ"],"expected_sections":["管理员能力"],"expected_keywords":["管理员","上传文档","游客","不能修改知识库"],"expected_refusal":false,"category":"产品FAQ"}
+{"question":"客服工单有哪些分类？","expected_sources":["客服工单规范"],"expected_sections":["工单分类"],"expected_keywords":["账号权限","产品使用","故障报修","数据问题","合同账单","需求建议"],"expected_refusal":false,"category":"客服工单规范"}
+{"question":"P0 工单需要多久响应？","expected_sources":["客服工单规范"],"expected_sections":["优先级定义"],"expected_keywords":["核心服务不可用","大面积客户受影响","15 分钟内响应"],"expected_refusal":false,"category":"客服工单规范"}
+{"question":"升级研发时必须提供哪些信息？","expected_sources":["客服工单规范"],"expected_sections":["升级研发"],"expected_keywords":["客户名称","复现步骤","截图或日志","影响范围"],"expected_refusal":false,"category":"客服工单规范"}
+{"question":"P1 工单关闭后还需要补充什么？","expected_sources":["客服工单规范"],"expected_sections":["关闭工单"],"expected_keywords":["P0","P1","复盘记录"],"expected_refusal":false,"category":"客服工单规范"}
+{"question":"销售创建合同前需要在 CRM 填哪些信息？","expected_sources":["销售合同流程"],"expected_sections":["商机确认"],"expected_keywords":["客户名称","联系人","预计金额","产品版本","交付范围"],"expected_refusal":false,"category":"销售合同流程"}
+{"question":"折扣超过 35% 的报价需要谁审批？","expected_sources":["销售合同流程"],"expected_sections":["报价审批"],"expected_keywords":["折扣超过 35%","战略客户","总经理审批"],"expected_refusal":false,"category":"销售合同流程"}
+{"question":"合同评审中法务主要关注什么？","expected_sources":["销售合同流程"],"expected_sections":["合同评审"],"expected_keywords":["付款条款","违约责任","数据安全条款"],"expected_refusal":false,"category":"销售合同流程"}
+{"question":"合同用印申请需要上传什么材料？","expected_sources":["销售合同流程"],"expected_sections":["用印申请"],"expected_keywords":["最终版合同","审批记录","客户开票信息"],"expected_refusal":false,"category":"销售合同流程"}
+{"question":"公司数据分为哪几个级别？","expected_sources":["数据安全规范"],"expected_sections":["数据分级"],"expected_keywords":["公开","内部","敏感","受限"],"expected_refusal":false,"category":"数据安全规范"}
+{"question":"处理客户数据时应该遵循什么原则？","expected_sources":["数据安全规范"],"expected_sections":["客户数据处理"],"expected_keywords":["最小权限原则","完成工作所必需","不得将客户数据下载"],"expected_refusal":false,"category":"数据安全规范"}
+{"question":"测试或演示中使用客户数据时有什么要求？","expected_sources":["数据安全规范"],"expected_sections":["脱敏要求"],"expected_keywords":["测试","演示","脱敏","手机号","邮箱"],"expected_refusal":false,"category":"数据安全规范"}
+{"question":"API Key 可以写进 README 或工单评论吗？","expected_sources":["数据安全规范"],"expected_sections":["API Key 管理"],"expected_keywords":["不得写入代码仓库","README","工单评论","立即废弃旧密钥"],"expected_refusal":false,"category":"数据安全规范"}
+{"question":"敏感数据对外共享需要哪些审批？","expected_sources":["数据安全规范"],"expected_sections":["外部共享"],"expected_keywords":["部门负责人","安全负责人审批","共享目的","数据范围"],"expected_refusal":false,"category":"数据安全规范"}
 {"question":"公司年会抽奖一等奖是什么？","expected_sources":[],"expected_sections":[],"expected_keywords":[],"expected_refusal":true,"category":"拒答"}
 {"question":"员工股票期权怎么归属？","expected_sources":[],"expected_sections":[],"expected_keywords":[],"expected_refusal":true,"category":"拒答"}
 {"question":"公司食堂早餐几点开始？","expected_sources":[],"expected_sections":[],"expected_keywords":[],"expected_refusal":true,"category":"拒答"}
+{"question":"CEO 明年计划把总部搬到哪里？","expected_sources":[],"expected_sections":[],"expected_keywords":[],"expected_refusal":true,"category":"拒答"}
+{"question":"客户 A 的真实合同金额是多少？","expected_sources":[],"expected_sections":[],"expected_keywords":[],"expected_refusal":true,"category":"拒答"}

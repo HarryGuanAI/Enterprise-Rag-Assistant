@@ -169,12 +169,30 @@ def main() -> None:
     )
     parser.add_argument("--enable-hybrid-search", action="store_true", help="Override settings and enable hybrid search.")
     parser.add_argument("--enable-rerank", action="store_true", help="Override settings and enable lightweight rerank.")
+    parser.add_argument("--disable-hybrid-search", action="store_true", help="Override settings and disable hybrid search.")
+    parser.add_argument("--disable-rerank", action="store_true", help="Override settings and disable lightweight rerank.")
     args = parser.parse_args()
+    if args.enable_hybrid_search and args.disable_hybrid_search:
+        parser.error("--enable-hybrid-search and --disable-hybrid-search cannot be used together.")
+    if args.enable_rerank and args.disable_rerank:
+        parser.error("--enable-rerank and --disable-rerank cannot be used together.")
+
+    hybrid_override = None
+    if args.enable_hybrid_search:
+        hybrid_override = True
+    elif args.disable_hybrid_search:
+        hybrid_override = False
+
+    rerank_override = None
+    if args.enable_rerank:
+        rerank_override = True
+    elif args.disable_rerank:
+        rerank_override = False
 
     report = run_eval(
         Path(args.dataset),
-        enable_hybrid_search=True if args.enable_hybrid_search else None,
-        enable_rerank=True if args.enable_rerank else None,
+        enable_hybrid_search=hybrid_override,
+        enable_rerank=rerank_override,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
