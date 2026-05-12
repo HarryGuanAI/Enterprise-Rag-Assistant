@@ -25,6 +25,24 @@ export type DocumentListResponse = {
   items: DocumentItem[];
 };
 
+export type DocumentPreviewChunk = {
+  id: string;
+  chunk_index: number;
+  section_path: string | null;
+  content: string;
+  start_offset: number | null;
+  end_offset: number | null;
+};
+
+export type DocumentPreviewResponse = {
+  id: string;
+  original_filename: string;
+  file_type: string;
+  status: string;
+  content: string;
+  chunks: DocumentPreviewChunk[];
+};
+
 export type LoginResponse = {
   access_token: string;
   token_type: string;
@@ -46,6 +64,35 @@ export type ChatCitation = {
   keyword_score?: number;
   source?: string;
   rank: number;
+};
+
+export type ConversationSummary = {
+  id: string;
+  title: string | null;
+  user_type: string;
+  guest_id: string | null;
+  message_count: number;
+  last_message_preview: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationListResponse = {
+  items: ConversationSummary[];
+};
+
+export type ConversationMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  citations: ChatCitation[];
+  created_at: string;
+};
+
+export type ConversationDetailResponse = {
+  id: string;
+  title: string | null;
+  messages: ConversationMessage[];
 };
 
 export type RetrievalDebug = {

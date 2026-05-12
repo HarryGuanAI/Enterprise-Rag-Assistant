@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 
 class ChatStreamRequest(BaseModel):
@@ -18,3 +19,31 @@ class CitationResponse(BaseModel):
     score: float
     rank: int
 
+
+class ConversationSummary(BaseModel):
+    id: UUID
+    title: str | None = None
+    user_type: str
+    guest_id: str | None = None
+    message_count: int
+    last_message_preview: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationListResponse(BaseModel):
+    items: list[ConversationSummary]
+
+
+class ChatMessageResponse(BaseModel):
+    id: UUID
+    role: str
+    content: str
+    citations: list[dict] = []
+    created_at: datetime
+
+
+class ConversationDetailResponse(BaseModel):
+    id: UUID
+    title: str | None = None
+    messages: list[ChatMessageResponse]

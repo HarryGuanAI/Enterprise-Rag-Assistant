@@ -7,7 +7,7 @@
 ## 功能亮点
 
 - 管理员登录与游客模式
-- 游客每日 2 次问答限制，控制公开演示成本
+- 游客每日 15 次问答限制，控制公开演示成本
 - PDF / DOCX / Markdown / TXT 文档上传
 - 后台异步解析、混合分块、DashScope `text-embedding-v4` 向量化
 - PostgreSQL + pgvector 向量检索
@@ -15,9 +15,11 @@
 - 轻量 Rerank：不额外调用模型的二次排序
 - 严格拒答：低相关问题不调用 LLM，降低幻觉和成本
 - DeepSeek `deepseek-chat` SSE 流式回答
+- 多轮对话：支持开启新对话、查看历史对话、加载历史消息，并结合最近上下文理解追问
+- 轻量意图识别：对“你能做什么”等能力咨询直接返回说明，跳过 RAG 和模型调用
 - 回答生成中支持手动停止，避免输出卡住时用户只能等待
 - 引用来源、相似度分数、检索调试信息展示
-- 回答后展示引用标签，点击可打开文档预览并定位到引用段落
+- 回答后展示引用标签，点击可打开全文文档预览并自动高亮命中 chunk
 - 37 条 golden QA 评测集，覆盖命中、拒答、关键词覆盖
 - Docker Compose 一键启动
 
@@ -127,6 +129,8 @@ docker compose run --rm -v "${PWD}/evals:/app/evals" -v "${PWD}/backend/app/eval
 - 为什么要严格拒答：知识库依据不足时不让模型自由发挥，同时节省 LLM 成本。
 - 为什么做 Hybrid Search：向量召回负责语义泛化，关键词召回补足专有名词和制度原文匹配。
 - 为什么做轻量 Rerank：先用低成本方式展示召回和精排的分层设计，后续可替换为模型 Rerank。
+- 为什么做多轮对话：真实知识库助手常有追问，需要保存会话和消息，并把最近对话作为上下文帮助模型理解“这个、那条、上一项”等指代。
+- 为什么做意图识别：不是所有输入都应该走 RAG。能力咨询、使用说明这类问题用规则路由直接回答，更快，也不会误触发严格拒答。
 - 为什么做评测集：RAG 优化不能只靠感觉，要用 golden QA 看命中率、拒答准确率和关键词覆盖。
 
 ## 文档
@@ -137,6 +141,7 @@ docker compose run --rm -v "${PWD}/evals:/app/evals" -v "${PWD}/backend/app/eval
 - [面试演示脚本](docs/demo-script.md)
 - [复盘与面试准备](docs/interview-retrospective-2026-05-12.md)
 - [开源前安全检查](docs/security-and-open-source-checklist.md)
+- [下一个 AI 窗口部署提示词](docs/next-ai-deployment-prompt-2026-05-12.md)
 - [评测说明](evals/README.md)
 
 ## 安全提醒

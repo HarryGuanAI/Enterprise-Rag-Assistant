@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.document import Document
 from app.models.document import DocumentChunk
+from app.schemas.document import DocumentPreviewChunk, DocumentPreviewResponse
 from app.rag.embeddings.dashscope_embedding import DashScopeEmbeddingClient
 from app.rag.loaders.document_loader import load_document_text
 from app.rag.splitters.hybrid_splitter import split_text
@@ -48,6 +49,31 @@ def mark_document_for_reprocess(db: Session, document_id: uuid.UUID) -> Document
     return document
 
 
+def get_document_preview(db: Session, document_id: uuid.UUID) -> DocumentPreviewResponse:
+    """返回用于前端全文预览的解析文本和 chunk 定位信息。"""
+    document = db.get(Document, document_id)
+    if document is None or document.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档不存在")
+
+    chunks = list(
+        db.scalars(
+            select(DocumentChunk)
+            .where(DocumentChunk.document_id == document.id)
+            .order_by(DocumentChunk.chunk_index.asc())
+        ).all()
+    )
+    content = _normalize_preview_text(load_document_text(document.file_path, document.file_type))
+    preview_chunks = _build_preview_chunks(content, chunks)
+    return DocumentPreviewResponse(
+        id=document.id,
+        original_filename=document.original_filename,
+        file_type=document.file_type,
+        status=document.status,
+        content=content,
+        chunks=preview_chunks,
+    )
+
+
 def _safe_filename(filename: str) -> str:
     """生成适合服务器保存的文件名片段。
 
@@ -69,6 +95,52 @@ def _normalize_filename(filename: str) -> str:
     except UnicodeError:
         return filename
     return decoded if decoded else filename
+
+
+def _normalize_preview_text(text: str) -> str:
+    lines = [line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    return "\n".join(lines).strip()
+
+
+def _chunk_search_text(chunk: DocumentChunk) -> str:
+    content = _normalize_preview_text(chunk.content)
+    if chunk.section_path and content.startswith(chunk.section_path):
+        content = content[len(chunk.section_path):].lstrip()
+    return content
+
+
+def _build_preview_chunks(content: str, chunks: list[DocumentChunk]) -> list[DocumentPreviewChunk]:
+    preview_chunks: list[DocumentPreviewChunk] = []
+    cursor = 0
+
+    for chunk in chunks:
+        search_text = _chunk_search_text(chunk)
+        start_offset: int | None = None
+        end_offset: int | None = None
+
+        if search_text:
+            # 分块之间可能存在 overlap，回退一小段再找能提高长文档定位稳定性。
+            search_from = max(cursor - 300, 0)
+            start = content.find(search_text, search_from)
+            if start < 0:
+                start = content.find(search_text)
+            if start >= 0:
+                start_offset = start
+                end_offset = start + len(search_text)
+                cursor = max(cursor, end_offset)
+
+        preview_chunks.append(
+            DocumentPreviewChunk(
+                id=chunk.id,
+                chunk_index=chunk.chunk_index,
+                section_path=chunk.section_path,
+                content=chunk.content,
+                start_offset=start_offset,
+                end_offset=end_offset,
+            )
+        )
+
+    return preview_chunks
 
 
 async def create_document_from_upload(db: Session, file: UploadFile) -> Document:

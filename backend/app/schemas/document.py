@@ -20,3 +20,22 @@ class DocumentResponse(BaseModel):
 class DocumentListResponse(BaseModel):
     items: list[DocumentResponse]
 
+
+class DocumentPreviewChunk(BaseModel):
+    id: UUID
+    chunk_index: int
+    section_path: str | None = None
+    content: str
+    start_offset: int | None = None
+    end_offset: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class DocumentPreviewResponse(BaseModel):
+    id: UUID
+    original_filename: str
+    file_type: str
+    status: str
+    content: str
+    chunks: list[DocumentPreviewChunk]

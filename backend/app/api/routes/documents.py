@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin
 from app.db.session import get_db
-from app.schemas.document import DocumentListResponse, DocumentResponse
+from app.schemas.document import DocumentListResponse, DocumentPreviewResponse, DocumentResponse
 from app.services.document_service import (
     create_document_from_upload,
+    get_document_preview,
     list_active_documents,
     mark_document_for_reprocess,
     process_document,
@@ -19,6 +20,11 @@ router = APIRouter()
 @router.get("", response_model=DocumentListResponse)
 def list_documents(db: Session = Depends(get_db)) -> DocumentListResponse:
     return DocumentListResponse(items=list_active_documents(db))
+
+
+@router.get("/{document_id}/preview", response_model=DocumentPreviewResponse)
+def preview_document(document_id: UUID, db: Session = Depends(get_db)) -> DocumentPreviewResponse:
+    return get_document_preview(db, document_id)
 
 
 @router.post("/upload")

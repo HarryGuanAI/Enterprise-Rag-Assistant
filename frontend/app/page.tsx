@@ -3,24 +3,36 @@
 import {
   BookOpen,
   CircleStop,
+  FileText,
   Hash,
+  History,
   Loader2,
   LockKeyhole,
+  MessageSquareText,
+  Phone,
+  Plus,
   Quote,
   RefreshCw,
   SendHorizontal,
   SlidersHorizontal,
   Upload,
   X,
+  UserRound,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent, RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { apiGet, apiPost, apiPut, apiUpload, streamSsePost } from "@/lib/api";
 import type {
   AppSettings,
   ChatCitation,
+  ConversationDetailResponse,
+  ConversationListResponse,
+  ConversationSummary,
   DocumentListResponse,
+  DocumentPreviewChunk,
+  DocumentPreviewResponse,
   LoginResponse,
   RetrievalDebug,
   StatsResponse,
@@ -33,6 +45,8 @@ type ChatMessage = {
   citations?: ChatCitation[];
 };
 
+type SidebarMode = "documents" | "history";
+
 const fallbackStats: StatsResponse = {
   document_count: 0,
   ready_document_count: 0,
@@ -41,8 +55,8 @@ const fallbackStats: StatsResponse = {
   today_refused_count: 0,
   today_model_call_count: 0,
   today_embedding_task_count: 0,
-  guest_remaining: 2,
-  guest_limit: 2,
+  guest_remaining: 15,
+  guest_limit: 15,
 };
 
 const defaultSettings: AppSettings = {
@@ -66,6 +80,7 @@ const defaultSettings: AppSettings = {
 };
 
 const exampleQuestions = [
+  "你能做什么？",
   "出差报销需要提交哪些材料？",
   "云舟知识库助手支持哪些文档格式？",
   "P0 工单需要多久响应？",
@@ -73,6 +88,12 @@ const exampleQuestions = [
   "折扣超过 35% 的报价需要谁审批？",
   "公司年会抽奖一等奖是什么？",
 ];
+
+const welcomeMessage: ChatMessage = {
+  id: "welcome",
+  role: "assistant",
+  content: "你好，我会基于已入库的企业文档回答问题，并在右侧展示引用来源。请先上传制度文档，或直接问一个和示例文档相关的问题。",
+};
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
@@ -93,6 +114,7 @@ export default function HomePage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isContactOpen, setIsContactOpen] = useState(false);
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -108,13 +130,10 @@ export default function HomePage() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [retrievalDebug, setRetrievalDebug] = useState<RetrievalDebug | null>(null);
   const [selectedCitation, setSelectedCitation] = useState<ChatCitation | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: "你好，我会基于已入库的企业文档回答问题，并在右侧展示引用来源。请先上传制度文档，或直接问一个和示例文档相关的问题。",
-    },
-  ]);
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>("documents");
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [conversationMessage, setConversationMessage] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage]);
   const [citations, setCitations] = useState<ChatCitation[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -134,8 +153,8 @@ export default function HomePage() {
   }, []);
 
   const statsQuery = useQuery({
-    queryKey: ["stats"],
-    queryFn: () => apiGet<StatsResponse>("/api/stats"),
+    queryKey: ["stats", guestId],
+    queryFn: () => apiGet<StatsResponse>(`/api/stats${guestId ? `?guest_id=${encodeURIComponent(guestId)}` : ""}`),
     refetchInterval: 5000,
   });
 
@@ -143,6 +162,17 @@ export default function HomePage() {
     queryKey: ["documents"],
     queryFn: () => apiGet<DocumentListResponse>("/api/documents"),
     refetchInterval: 5000,
+  });
+
+  const conversationsQuery = useQuery({
+    queryKey: ["conversations", guestId, adminToken],
+    queryFn: () =>
+      apiGet<ConversationListResponse>(
+        `/api/chat/conversations${!adminToken && guestId ? `?guest_id=${encodeURIComponent(guestId)}` : ""}`,
+        adminToken ?? undefined,
+      ),
+    enabled: Boolean(adminToken || guestId),
+    refetchInterval: 8000,
   });
 
   const settingsQuery = useQuery({
@@ -162,6 +192,7 @@ export default function HomePage() {
 
   const stats = statsQuery.data ?? fallbackStats;
   const documents = documentsQuery.data?.items ?? [];
+  const conversations = conversationsQuery.data?.items ?? [];
   const statSummary = [
     { label: "文档", value: String(stats.document_count) },
     { label: "分块", value: String(stats.chunk_count) },
@@ -175,6 +206,7 @@ export default function HomePage() {
       : "游客模式";
   const isAdmin = Boolean(adminToken);
   const hasStartedConversation = messages.some((item) => item.role === "user");
+  const currentConversation = conversations.find((item) => item.id === conversationId);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -273,6 +305,54 @@ export default function HomePage() {
     }
   }
 
+  function handleNewConversation() {
+    askAbortControllerRef.current?.abort();
+    setConversationId(null);
+    setMessages([{ ...welcomeMessage, id: createLocalId("welcome") }]);
+    setQuestion("");
+    setChatError(null);
+    setChatStatus(null);
+    setCitations([]);
+    setRetrievalDebug(null);
+    setConversationMessage(null);
+  }
+
+  async function handleOpenConversation(item: ConversationSummary) {
+    if (isAsking) {
+      return;
+    }
+
+    setIsLoadingConversation(true);
+    setConversationMessage(null);
+    try {
+      const detail = await apiGet<ConversationDetailResponse>(
+        `/api/chat/conversations/${item.id}${!adminToken && guestId ? `?guest_id=${encodeURIComponent(guestId)}` : ""}`,
+        adminToken ?? undefined,
+      );
+      setConversationId(detail.id);
+      setMessages(
+        detail.messages.length
+          ? detail.messages.map((message) => ({
+              id: message.id,
+              role: message.role,
+              content: message.content,
+              citations: message.citations,
+            }))
+          : [{ ...welcomeMessage, id: createLocalId("welcome") }],
+      );
+      const lastAssistant = [...detail.messages].reverse().find((message) => message.role === "assistant");
+      setCitations(lastAssistant?.citations ?? []);
+      setRetrievalDebug(null);
+      setChatError(null);
+      setChatStatus(null);
+      setSidebarMode("history");
+    } catch (error) {
+      setConversationMessage(error instanceof Error ? error.message : "加载历史对话失败");
+    } finally {
+      setIsLoadingConversation(false);
+    }
+  }
+
   async function handleAsk(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuestion = question.trim();
@@ -343,6 +423,7 @@ export default function HomePage() {
         abortController.signal,
       );
       await statsQuery.refetch();
+      await conversationsQuery.refetch();
     } catch (error) {
       if (abortController.signal.aborted) {
         setChatStatus(null);
@@ -436,19 +517,53 @@ export default function HomePage() {
           </div>
         </header>
 
+        {!isAdmin ? (
+          <section className="flex shrink-0 items-center justify-between gap-3 rounded-lg border border-copper/20 bg-copper/10 px-4 py-3 text-sm text-ink shadow-sm">
+            <div className="min-w-0 leading-6">
+              <strong className="font-semibold">游客体验提示：</strong>
+              由于页面仅用于学习展示，如想体验更多功能，请联系管理员进行登录。
+              <span className="ml-2 text-moss">今日剩余 {stats.guest_remaining ?? 0}/{stats.guest_limit ?? 15} 次问答。</span>
+            </div>
+            <button
+              type="button"
+              className="flex shrink-0 items-center gap-2 rounded-md bg-moss px-3 py-2 text-xs font-medium text-white transition hover:bg-ink"
+              onClick={() => setIsContactOpen(true)}
+            >
+              <Phone className="h-4 w-4" />
+              管理员联系方式
+            </button>
+          </section>
+        ) : null}
+
         <section className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[230px_minmax(0,1fr)_300px]">
           <aside className="flex min-h-0 flex-col rounded-lg border border-moss/10 bg-white/80 p-3 shadow-panel">
             <div className="mb-3 flex shrink-0 items-center justify-between">
               <h2 className="text-base font-semibold">知识库文档</h2>
-              <button
-                className="rounded-md bg-moss p-2 text-white transition hover:bg-ink disabled:cursor-not-allowed disabled:bg-moss/35"
-                aria-label="上传文档"
-                disabled={!isAdmin || isUploading}
-                title={isAdmin ? "上传文档" : "请先登录管理员账号"}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  className={
+                    sidebarMode === "history"
+                      ? "rounded-md border border-moss/15 bg-white/75 p-2 text-moss transition hover:bg-reed/50"
+                      : "rounded-md border border-moss/15 bg-white/75 p-2 text-moss transition hover:bg-reed/50"
+                  }
+                  aria-label={sidebarMode === "history" ? "查看知识库文档" : "查看历史对话"}
+                  title={sidebarMode === "history" ? "知识库文档" : "历史对话"}
+                  onClick={() => setSidebarMode(sidebarMode === "history" ? "documents" : "history")}
+                >
+                  {sidebarMode === "history" ? <FileText className="h-4 w-4" /> : <History className="h-4 w-4" />}
+                </button>
+                {sidebarMode === "documents" ? (
+                  <button
+                    className="rounded-md bg-moss p-2 text-white transition hover:bg-ink disabled:cursor-not-allowed disabled:bg-moss/35"
+                    aria-label="上传文档"
+                    disabled={!isAdmin || isUploading}
+                    title={isAdmin ? "上传文档" : "请先登录管理员账号"}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  </button>
+                ) : null}
+              </div>
               <input
                 ref={fileInputRef}
                 className="hidden"
@@ -463,7 +578,15 @@ export default function HomePage() {
               </div>
             ) : null}
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {documents.length ? (
+              {sidebarMode === "history" ? (
+                <HistoryConversationList
+                  conversations={conversations}
+                  currentConversationId={conversationId}
+                  isLoading={conversationsQuery.isLoading || isLoadingConversation}
+                  message={conversationMessage}
+                  onOpen={handleOpenConversation}
+                />
+              ) : documents.length ? (
                 documents.map((doc) => (
                   <div key={doc.id} className="rounded-md border border-reed bg-linen/55 px-3 py-2.5">
                     <div className="flex items-center justify-between gap-2">
@@ -497,9 +620,25 @@ export default function HomePage() {
           </aside>
 
           <section className="flex min-h-0 flex-col rounded-lg border border-moss/10 bg-white/90 shadow-panel">
-            <div className="shrink-0 border-b border-moss/10 px-6 py-4">
-              <h2 className="text-lg font-semibold">企业知识库问答</h2>
-              <p className="mt-1 text-sm text-moss">回答严格基于已入库资料；检索不到可靠依据时会拒答。</p>
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-moss/10 px-6 py-4">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-semibold">
+                  {currentConversation?.title ? currentConversation.title : "企业知识库问答"}
+                </h2>
+                <p className="mt-1 text-sm text-moss">
+                  {conversationId ? "当前为多轮对话，系统会结合最近上下文理解追问。" : "回答严格基于已入库资料；检索不到可靠依据时会拒答。"}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="flex shrink-0 items-center gap-2 rounded-md border border-moss/20 bg-white/75 px-3 py-2 text-xs text-moss transition hover:bg-reed/50"
+                onClick={handleNewConversation}
+                disabled={isAsking}
+                title="开启新对话"
+              >
+                <Plus className="h-4 w-4" />
+                开启新对话
+              </button>
             </div>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
               {messages.map((item) => (
@@ -707,6 +846,60 @@ export default function HomePage() {
         </div>
       ) : null}
 
+      {isContactOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 px-4">
+          <div className="w-full max-w-md rounded-md border border-moss/15 bg-linen p-5 shadow-panel">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-xs font-medium text-moss">
+                  <UserRound className="h-4 w-4" />
+                  管理员联系方式 / Admin Contact
+                </div>
+                <h2 className="text-lg font-semibold">联系管理员获取完整体验</h2>
+                <p className="mt-1 text-sm leading-6 text-moss">
+                  当前页面仅用于学习展示，更多功能需要管理员登录后体验。
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-md border border-moss/15 bg-white/70 p-2 text-moss transition hover:bg-reed/50"
+                onClick={() => setIsContactOpen(false)}
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <section className="rounded-md border border-reed bg-white/70 p-4">
+                <h3 className="text-sm font-semibold">中文</h3>
+                <div className="mt-3 space-y-2 text-sm leading-6 text-ink">
+                  <div>管理员姓名：关海龙</div>
+                  <div>联系电话：+86 15031597985</div>
+                </div>
+              </section>
+              <section className="rounded-md border border-reed bg-white/70 p-4">
+                <h3 className="text-sm font-semibold">English</h3>
+                <div className="mt-3 space-y-2 text-sm leading-6 text-ink">
+                  <div>Administrator: Harry Guan</div>
+                  <div>Phone: +86 15031597985</div>
+                </div>
+              </section>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                className="rounded-md bg-moss px-4 py-2 text-sm font-medium text-white transition hover:bg-ink"
+                onClick={() => setIsContactOpen(false)}
+              >
+                我知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {isSettingsOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 px-4">
           <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-md border border-moss/15 bg-linen p-5 shadow-panel">
@@ -833,6 +1026,83 @@ export default function HomePage() {
   );
 }
 
+function HistoryConversationList({
+  conversations,
+  currentConversationId,
+  isLoading,
+  message,
+  onOpen,
+}: {
+  conversations: ConversationSummary[];
+  currentConversationId: string | null;
+  isLoading: boolean;
+  message: string | null;
+  onOpen: (conversation: ConversationSummary) => void;
+}) {
+  if (isLoading && !conversations.length) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-moss/10 bg-linen/45 p-4 text-sm text-moss">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        正在加载历史对话...
+      </div>
+    );
+  }
+
+  if (!conversations.length) {
+    return (
+      <div className="rounded-md border border-dashed border-moss/25 bg-linen/40 p-4 text-sm leading-6 text-moss">
+        暂无历史对话。发送第一个问题后，这里会保存会话入口。
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {message ? <div className="rounded-md border border-reed bg-linen/70 px-3 py-2 text-xs text-copper">{message}</div> : null}
+      {conversations.map((conversation) => {
+        const isActive = conversation.id === currentConversationId;
+        return (
+          <button
+            key={conversation.id}
+            type="button"
+            className={
+              isActive
+                ? "w-full rounded-md border border-moss/30 bg-moss/10 px-3 py-2.5 text-left"
+                : "w-full rounded-md border border-reed bg-linen/55 px-3 py-2.5 text-left transition hover:border-moss/25 hover:bg-linen"
+            }
+            onClick={() => onOpen(conversation)}
+          >
+            <div className="flex items-start gap-2">
+              <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-moss" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium" title={conversation.title ?? "未命名对话"}>
+                  {conversation.title ?? "未命名对话"}
+                </div>
+                <div className="mt-1 text-xs text-moss">
+                  {conversation.message_count} 条消息 · {formatShortDate(conversation.updated_at)}
+                </div>
+                {conversation.last_message_preview ? (
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-ink/72">{conversation.last_message_preview}</p>
+                ) : null}
+              </div>
+            </div>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+function formatShortDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
 function CitationTags({
   citations,
   onOpen,
@@ -864,24 +1134,41 @@ function CitationTags({
 }
 
 function CitationPreviewDrawer({ citation, onClose }: { citation: ChatCitation; onClose: () => void }) {
-  const hitRef = useRef<HTMLDivElement | null>(null);
+  const hitRef = useRef<HTMLDivElement>(null);
+  const previewQuery = useQuery({
+    queryKey: ["document-preview", citation.document_id],
+    queryFn: () => apiGet<DocumentPreviewResponse>(`/api/documents/${citation.document_id}/preview`),
+  });
+
+  const preview = previewQuery.data;
+  const activeChunk = preview?.chunks.find((chunk) => chunk.id === citation.chunk_id);
+  const hasOffsets =
+    typeof activeChunk?.start_offset === "number" &&
+    typeof activeChunk?.end_offset === "number" &&
+    activeChunk.start_offset >= 0 &&
+    activeChunk.end_offset > activeChunk.start_offset;
 
   useEffect(() => {
-    hitRef.current?.scrollIntoView({ block: "center" });
-  }, [citation.chunk_id]);
+    if (!previewQuery.isSuccess) {
+      return;
+    }
+    window.setTimeout(() => hitRef.current?.scrollIntoView({ block: "center" }), 0);
+  }, [citation.chunk_id, previewQuery.isSuccess]);
 
   return (
     <div className="fixed inset-0 z-50 bg-ink/20">
       <button className="absolute inset-0 h-full w-full cursor-default" aria-label="关闭引用预览" onClick={onClose} />
-      <aside className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col border-l border-moss/15 bg-linen shadow-2xl">
+      <aside className="absolute right-0 top-0 flex h-full w-full max-w-2xl flex-col border-l border-moss/15 bg-linen shadow-2xl">
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-moss/10 px-6 py-5">
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-medium text-moss">
               <BookOpen className="h-4 w-4" />
-              文档预览
+              全文预览
             </div>
-            <h2 className="text-xl font-semibold">{citation.title}</h2>
-            {citation.section ? <p className="mt-1 text-sm text-moss">{citation.section}</p> : null}
+            <h2 className="text-xl font-semibold">{preview?.original_filename ?? citation.title}</h2>
+            {activeChunk?.section_path ?? citation.section ? (
+              <p className="mt-1 text-sm text-moss">{activeChunk?.section_path ?? citation.section}</p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -897,6 +1184,11 @@ function CitationPreviewDrawer({ citation, onClose }: { citation: ChatCitation; 
           <div className="flex flex-wrap gap-2 text-xs text-moss">
             <span className="rounded-md bg-moss/10 px-2 py-1">Top {citation.rank}</span>
             <span className="rounded-md bg-moss/10 px-2 py-1">相似度 {citation.score.toFixed(4)}</span>
+            {typeof activeChunk?.chunk_index === "number" ? (
+              <span className="rounded-md bg-moss/10 px-2 py-1">
+                Chunk {activeChunk.chunk_index + 1}/{preview?.chunks.length ?? "-"}
+              </span>
+            ) : null}
             {typeof citation.vector_score === "number" ? (
               <span className="rounded-md bg-moss/10 px-2 py-1">向量 {citation.vector_score.toFixed(4)}</span>
             ) : null}
@@ -907,23 +1199,79 @@ function CitationPreviewDrawer({ citation, onClose }: { citation: ChatCitation; 
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-          <div className="rounded-lg border border-moss/10 bg-white/70 p-5">
-            <div className="mb-5 flex items-center gap-2 text-xs font-medium text-moss">
-              <Hash className="h-3.5 w-3.5" />
-              已定位到引用段落
+          {previewQuery.isLoading ? (
+            <div className="flex items-center gap-2 rounded-md border border-moss/10 bg-white/70 p-4 text-sm text-moss">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              正在加载全文...
             </div>
-            <div className="space-y-4 text-sm leading-7 text-ink/82">
-              <p className="rounded-md border border-dashed border-reed bg-linen/50 p-4 text-moss">
-                以下预览基于本次检索命中的知识片段，已自动定位到用于回答的段落。
-              </p>
-              <div ref={hitRef} className="rounded-lg border border-copper/30 bg-copper/10 p-5 shadow-sm">
-                <div className="mb-3 text-xs font-semibold text-copper">引用段落</div>
-                <p className="whitespace-pre-wrap text-[15px] leading-8 text-ink">{citation.text}</p>
-              </div>
+          ) : null}
+          {previewQuery.isError ? (
+            <FallbackCitationHit citation={citation} hitRef={hitRef} label="全文加载失败，显示引用快照" />
+          ) : null}
+          {preview && hasOffsets && activeChunk ? (
+            <FullDocumentText content={preview.content} activeChunk={activeChunk} hitRef={hitRef} />
+          ) : null}
+          {preview && (!hasOffsets || !activeChunk) ? (
+            <div className="space-y-4">
+              <FullDocumentText content={preview.content} />
+              <FallbackCitationHit citation={citation} hitRef={hitRef} label="引用快照" />
             </div>
-          </div>
+          ) : null}
         </div>
       </aside>
+    </div>
+  );
+}
+
+function FullDocumentText({
+  content,
+  activeChunk,
+  hitRef,
+}: {
+  content: string;
+  activeChunk?: DocumentPreviewChunk;
+  hitRef?: RefObject<HTMLDivElement>;
+}) {
+  if (!activeChunk || activeChunk.start_offset === null || activeChunk.end_offset === null) {
+    return (
+      <article className="rounded-md border border-moss/10 bg-white/70 p-5">
+        <p className="whitespace-pre-wrap text-[15px] leading-8 text-ink/88">{content}</p>
+      </article>
+    );
+  }
+
+  const before = content.slice(0, activeChunk.start_offset);
+  const hit = content.slice(activeChunk.start_offset, activeChunk.end_offset);
+  const after = content.slice(activeChunk.end_offset);
+
+  return (
+    <article className="rounded-md border border-moss/10 bg-white/70 p-5">
+      {before ? <p className="whitespace-pre-wrap text-[15px] leading-8 text-ink/78">{before}</p> : null}
+      <div ref={hitRef} className="my-4 rounded-md border border-copper/35 bg-copper/10 p-4 shadow-sm">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-copper">
+          <Hash className="h-3.5 w-3.5" />
+          命中分块
+        </div>
+        <p className="whitespace-pre-wrap text-[15px] leading-8 text-ink">{hit}</p>
+      </div>
+      {after ? <p className="whitespace-pre-wrap text-[15px] leading-8 text-ink/78">{after}</p> : null}
+    </article>
+  );
+}
+
+function FallbackCitationHit({
+  citation,
+  hitRef,
+  label,
+}: {
+  citation: ChatCitation;
+  hitRef: RefObject<HTMLDivElement>;
+  label: string;
+}) {
+  return (
+    <div ref={hitRef} className="rounded-md border border-copper/35 bg-copper/10 p-5 shadow-sm">
+      <div className="mb-3 text-xs font-semibold text-copper">{label}</div>
+      <p className="whitespace-pre-wrap text-[15px] leading-8 text-ink">{citation.text}</p>
     </div>
   );
 }

@@ -33,8 +33,8 @@ class Settings(BaseSettings):
 
     upload_dir: str = "storage/uploads"
     max_upload_mb: int = 10
-    guest_question_limit: int = Field(default=2, ge=1)
-    guest_ip_daily_limit: int = Field(default=10, ge=1)
+    guest_question_limit: int = Field(default=15, ge=1)
+    guest_ip_daily_limit: int = Field(default=100, ge=1)
 
     @property
     def cors_origins(self) -> list[str]:
@@ -47,4 +47,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

@@ -131,3 +131,55 @@ docker compose up -d --build backend
 - 更换数据库密码
 - 重新生成 API Key，废弃曾经暴露过的旧 Key
 - 确认 `.env`、`storage/uploads/`、真实业务文档没有进入 Git
+
+## 7. 上线前配置建议
+
+公开演示或部署到云服务器前，建议按下面顺序检查：
+
+1. API Key 轮换
+
+   本项目开发过程中曾使用真实 DashScope 和 DeepSeek Key。上线前应在平台重新生成 Key，并废弃旧 Key，避免历史暴露风险。
+
+2. 游客限额
+
+   当前默认：
+
+   ```text
+   GUEST_QUESTION_LIMIT=15
+   GUEST_IP_DAILY_LIMIT=100
+   ```
+
+   `GUEST_QUESTION_LIMIT` 控制单个游客每天可问次数；`GUEST_IP_DAILY_LIMIT` 是同一 IP 的兜底限制。公开部署时可根据预算调低或调高。
+
+3. 域名与 CORS
+
+   如果前端和后端使用不同域名，需要同时设置：
+
+   ```text
+   BACKEND_CORS_ORIGINS=https://你的前端域名
+   NEXT_PUBLIC_API_BASE_URL=https://你的后端域名
+   ```
+
+4. 数据与样例文档
+
+   上线演示建议只导入 `sample_docs/` 中的虚构资料。不要上传真实员工、客户、合同、财务、日志或密钥相关文件。
+
+5. 端口与反向代理
+
+   Docker Compose 默认暴露：
+
+   - 前端：`3000`
+   - 后端：`8000`
+   - PostgreSQL：`5432`
+
+   公网部署时建议只暴露前端和后端 API，PostgreSQL 不直接暴露公网。可用 Nginx/Caddy 做 HTTPS 和反向代理。
+
+6. 上线后验证
+
+   - 前端首页可访问。
+   - `/health` 返回 ok。
+   - 管理员可登录。
+   - 游客提示和管理员联系方式正常显示。
+   - “你能做什么？”走意图识别快路径。
+   - 知识库外问题严格拒答且不展示无关引用。
+   - 引用标签可打开全文预览并高亮命中 chunk。
