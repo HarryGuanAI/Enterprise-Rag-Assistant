@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, model_validator
 
 class RetrievalSettings(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20)
-    min_similarity: float = Field(default=0.35, ge=0, le=1)
+    min_similarity: float = Field(default=0.6, ge=0, le=1)
     strict_refusal: bool = True
     enable_hybrid_search: bool = False
     enable_rerank: bool = False
@@ -31,4 +31,3 @@ class AppSettingsSchema(BaseModel):
     retrieval: RetrievalSettings = RetrievalSettings()
     chunking: ChunkingSettings = ChunkingSettings()
     generation: GenerationSettings = GenerationSettings()
-

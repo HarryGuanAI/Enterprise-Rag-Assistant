@@ -44,3 +44,37 @@ export type ChatCitation = {
   score: number;
   rank: number;
 };
+
+export type RetrievalDebug = {
+  top_k: number;
+  min_similarity: number;
+  strict_refusal: boolean;
+  enable_hybrid_search: boolean;
+  enable_rerank: boolean;
+  embedding_model: string;
+  generation_model: string;
+  best_score: number;
+  refused: boolean;
+  will_call_llm: boolean;
+  reason: string;
+};
+
+export type AppSettings = {
+  retrieval: {
+    top_k: number;
+    min_similarity: number;
+    strict_refusal: boolean;
+    enable_hybrid_search: boolean;
+    enable_rerank: boolean;
+  };
+  chunking: {
+    chunk_size: number;
+    chunk_overlap: number;
+    min_chunk_size: number;
+    enable_section_path: boolean;
+  };
+  generation: {
+    temperature: number;
+    max_tokens: number;
+  };
+};

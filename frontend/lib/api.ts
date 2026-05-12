@@ -33,6 +33,23 @@ export async function apiPost<T>(path: string, body: JsonBody, token?: string): 
   return response.json() as Promise<T>;
 }
 
+export async function apiPut<T>(path: string, body: JsonBody, token?: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response));
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export async function apiUpload<T>(path: string, formData: FormData, token: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",

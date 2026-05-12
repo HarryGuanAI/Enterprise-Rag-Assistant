@@ -9,14 +9,22 @@ import {
   RefreshCw,
   SearchCheck,
   SendHorizontal,
+  SlidersHorizontal,
   Upload,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 
-import { apiGet, apiPost, apiUpload, streamSsePost } from "@/lib/api";
-import type { ChatCitation, DocumentListResponse, LoginResponse, StatsResponse } from "@/types/api";
+import { apiGet, apiPost, apiPut, apiUpload, streamSsePost } from "@/lib/api";
+import type {
+  AppSettings,
+  ChatCitation,
+  DocumentListResponse,
+  LoginResponse,
+  RetrievalDebug,
+  StatsResponse,
+} from "@/types/api";
 
 type ChatMessage = {
   id: string;
@@ -34,6 +42,26 @@ const fallbackStats: StatsResponse = {
   today_embedding_task_count: 0,
   guest_remaining: 2,
   guest_limit: 2,
+};
+
+const defaultSettings: AppSettings = {
+  retrieval: {
+    top_k: 5,
+    min_similarity: 0.6,
+    strict_refusal: true,
+    enable_hybrid_search: false,
+    enable_rerank: false,
+  },
+  chunking: {
+    chunk_size: 800,
+    chunk_overlap: 120,
+    min_chunk_size: 100,
+    enable_section_path: true,
+  },
+  generation: {
+    temperature: 0.2,
+    max_tokens: 1200,
+  },
 };
 
 function statusLabel(status: string) {
@@ -54,6 +82,7 @@ export default function HomePage() {
   const [guestId, setGuestId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -64,6 +93,10 @@ export default function HomePage() {
   const [isAsking, setIsAsking] = useState(false);
   const [chatStatus, setChatStatus] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [settingsDraft, setSettingsDraft] = useState<AppSettings>(defaultSettings);
+  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [retrievalDebug, setRetrievalDebug] = useState<RetrievalDebug | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -73,6 +106,7 @@ export default function HomePage() {
   ]);
   const [citations, setCitations] = useState<ChatCitation[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setAdminToken(window.localStorage.getItem("admin_token"));
@@ -92,6 +126,21 @@ export default function HomePage() {
     queryFn: () => apiGet<DocumentListResponse>("/api/documents"),
     refetchInterval: 5000,
   });
+
+  const settingsQuery = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => apiGet<AppSettings>("/api/settings"),
+  });
+
+  useEffect(() => {
+    if (settingsQuery.data) {
+      setSettingsDraft(settingsQuery.data);
+    }
+  }, [settingsQuery.data]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, chatStatus, isAsking]);
 
   const stats = statsQuery.data ?? fallbackStats;
   const documents = documentsQuery.data?.items ?? [];
@@ -129,6 +178,41 @@ export default function HomePage() {
   function handleLogout() {
     window.localStorage.removeItem("admin_token");
     setAdminToken(null);
+  }
+
+  async function handleSaveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!adminToken) {
+      return;
+    }
+    if (settingsDraft.chunking.chunk_overlap >= settingsDraft.chunking.chunk_size) {
+      setSettingsMessage("chunk_overlap 必须小于 chunk_size");
+      return;
+    }
+
+    setIsSavingSettings(true);
+    setSettingsMessage(null);
+    try {
+      const saved = await apiPut<AppSettings>("/api/settings", settingsDraft, adminToken);
+      setSettingsDraft(saved);
+      await settingsQuery.refetch();
+      setSettingsMessage("设置已保存");
+    } catch (error) {
+      setSettingsMessage(error instanceof Error ? error.message : "保存失败，请稍后重试");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }
+
+  function updateSettingsDraft(path: string, value: number | boolean) {
+    const [group, key] = path.split(".") as [keyof AppSettings, string];
+    setSettingsDraft((current) => ({
+      ...current,
+      [group]: {
+        ...current[group],
+        [key]: value,
+      },
+    }));
   }
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -183,6 +267,7 @@ export default function HomePage() {
     setChatError(null);
     setChatStatus("正在提交问题...");
     setCitations([]);
+    setRetrievalDebug(null);
     setMessages((current) => [
       ...current,
       { id: createLocalId("user"), role: "user", content: trimmedQuestion },
@@ -210,6 +295,9 @@ export default function HomePage() {
             }
             if (eventName === "citations") {
               setCitations((data.citations as ChatCitation[]) ?? []);
+            }
+            if (eventName === "retrieval_debug") {
+              setRetrievalDebug(data as RetrievalDebug);
             }
             if (eventName === "error") {
               const message = String(data.message ?? "问答失败，请稍后重试");
@@ -242,9 +330,10 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen px-6 py-6 text-ink">
-      <section className="mx-auto flex max-w-7xl flex-col gap-5">
-        <header className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-moss/15 bg-linen/85 px-5 py-4 shadow-panel backdrop-blur">
+    <main className="h-screen overflow-hidden px-6 py-4 text-ink">
+      <section className="mx-auto flex h-full max-w-7xl flex-col gap-3">
+        <header className="shrink-0 rounded-md border border-moss/15 bg-linen/85 px-5 py-3 shadow-panel backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm text-moss">Enterprise RAG Assistant</p>
             <h1 className="text-2xl font-semibold tracking-normal">云舟知识库助手</h1>
@@ -255,12 +344,21 @@ export default function HomePage() {
               {isAdmin ? "管理员模式" : guestText}
             </div>
             {isAdmin ? (
-              <button
-                className="rounded-md border border-moss/20 bg-white/70 px-3 py-2 text-sm text-moss hover:bg-reed/50"
-                onClick={handleLogout}
-              >
-                退出
-              </button>
+              <>
+                <button
+                  className="flex items-center gap-2 rounded-md border border-moss/20 bg-white/70 px-3 py-2 text-sm text-moss hover:bg-reed/50"
+                  onClick={() => setIsSettingsOpen(true)}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  RAG 设置
+                </button>
+                <button
+                  className="rounded-md border border-moss/20 bg-white/70 px-3 py-2 text-sm text-moss hover:bg-reed/50"
+                  onClick={handleLogout}
+                >
+                  退出
+                </button>
+              </>
             ) : (
               <button
                 className="rounded-md bg-moss px-3 py-2 text-sm font-medium text-white hover:bg-ink"
@@ -270,11 +368,12 @@ export default function HomePage() {
               </button>
             )}
           </div>
+          </div>
         </header>
 
-        <section className="grid gap-3 md:grid-cols-5">
+        <section className="grid shrink-0 gap-3 md:grid-cols-5">
           {statCards.map(({ label, value, icon: Icon }) => (
-            <div key={label} className="rounded-md border border-moss/15 bg-white/75 p-4 shadow-panel">
+            <div key={label} className="rounded-md border border-moss/15 bg-white/75 px-4 py-3 shadow-panel">
               <div className="flex items-center justify-between text-sm text-moss">
                 <span>{label}</span>
                 <Icon className="h-4 w-4" />
@@ -284,9 +383,9 @@ export default function HomePage() {
           ))}
         </section>
 
-        <section className="grid min-h-[620px] gap-4 lg:grid-cols-[280px_1fr_340px]">
-          <aside className="rounded-md border border-moss/15 bg-white/80 p-4 shadow-panel">
-            <div className="mb-4 flex items-center justify-between">
+        <section className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)_340px]">
+          <aside className="flex min-h-0 flex-col rounded-md border border-moss/15 bg-white/80 p-4 shadow-panel">
+            <div className="mb-4 flex shrink-0 items-center justify-between">
               <h2 className="font-semibold">知识库文档</h2>
               <button
                 className="rounded-md bg-moss p-2 text-white disabled:cursor-not-allowed disabled:bg-moss/35"
@@ -310,7 +409,7 @@ export default function HomePage() {
                 {uploadMessage}
               </div>
             ) : null}
-            <div className="space-y-3">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {documents.length ? (
                 documents.map((doc) => (
                   <div key={doc.id} className="rounded-md border border-reed bg-linen/60 p-3">
@@ -342,26 +441,35 @@ export default function HomePage() {
             </div>
           </aside>
 
-          <section className="flex flex-col rounded-md border border-moss/15 bg-white/85 shadow-panel">
-            <div className="border-b border-moss/10 px-5 py-4">
+          <section className="flex min-h-0 flex-col rounded-md border border-moss/15 bg-white/85 shadow-panel">
+            <div className="shrink-0 border-b border-moss/10 px-5 py-4">
               <h2 className="font-semibold">企业知识库问答</h2>
               <p className="mt-1 text-sm text-moss">回答严格基于已入库资料；检索不到可靠依据时会拒答。</p>
             </div>
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
               {messages.map((item) => (
                 <div
                   key={item.id}
                   className={
                     item.role === "user"
                       ? "ml-auto max-w-[78%] rounded-md bg-moss px-4 py-3 text-sm leading-6 text-white"
-                      : "max-w-[84%] whitespace-pre-wrap rounded-md border border-reed bg-linen/70 px-4 py-3 text-sm leading-6"
+                      : "max-w-[84%] rounded-md border border-reed bg-linen/70 px-4 py-3 text-sm leading-6"
                   }
                 >
-                  {item.content || <span className="text-moss">正在生成回答...</span>}
+                  {item.content ? (
+                    item.role === "assistant" ? (
+                      <FormattedAnswer content={item.content} />
+                    ) : (
+                      item.content
+                    )
+                  ) : (
+                    <span className="text-moss">正在生成回答...</span>
+                  )}
                 </div>
               ))}
+              <div ref={messagesEndRef} />
             </div>
-            <div className="border-t border-moss/10 p-4">
+            <div className="shrink-0 border-t border-moss/10 bg-white/90 p-4">
               {chatStatus || chatError ? (
                 <div className="mb-3 rounded-md border border-reed bg-linen/60 px-3 py-2 text-xs leading-5 text-moss">
                   {chatError ?? chatStatus}
@@ -385,10 +493,43 @@ export default function HomePage() {
             </div>
           </section>
 
-          <aside className="rounded-md border border-moss/15 bg-white/80 p-4 shadow-panel">
-            <h2 className="font-semibold">引用来源</h2>
-            <p className="mt-1 text-sm text-moss">本次回答使用的知识片段</p>
-            <div className="mt-4 space-y-3">
+          <aside className="flex min-h-0 flex-col rounded-md border border-moss/15 bg-white/80 p-4 shadow-panel">
+            <div className="shrink-0">
+              <h2 className="font-semibold">引用来源</h2>
+              <p className="mt-1 text-sm text-moss">本次回答使用的知识片段</p>
+            </div>
+            {retrievalDebug ? (
+              <section className="mt-4 shrink-0 rounded-md border border-moss/15 bg-white/70 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-medium">检索调试</div>
+                  <span
+                    className={
+                      retrievalDebug.refused
+                        ? "rounded-md bg-copper/10 px-2 py-1 text-xs text-copper"
+                        : "rounded-md bg-moss/10 px-2 py-1 text-xs text-moss"
+                    }
+                  >
+                    {retrievalDebug.refused ? "已拒答" : "已调用模型"}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-moss">{retrievalDebug.reason}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <DebugMetric label="TopK" value={String(retrievalDebug.top_k)} />
+                  <DebugMetric label="阈值" value={retrievalDebug.min_similarity.toFixed(2)} />
+                  <DebugMetric label="Top1" value={retrievalDebug.best_score.toFixed(4)} />
+                  <DebugMetric label="拒答" value={retrievalDebug.strict_refusal ? "开启" : "关闭"} />
+                </div>
+                <div className="mt-3 space-y-1 text-xs leading-5 text-moss">
+                  <div>Embedding：{retrievalDebug.embedding_model}</div>
+                  <div>生成模型：{retrievalDebug.generation_model}</div>
+                  <div>
+                    Hybrid / Rerank：{retrievalDebug.enable_hybrid_search ? "开" : "关"} /{" "}
+                    {retrievalDebug.enable_rerank ? "开" : "关"}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+            <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {citations.length ? (
                 citations.map((item) => (
                   <article key={item.chunk_id} className="rounded-md border border-reed bg-linen/60 p-3">
@@ -456,6 +597,255 @@ export default function HomePage() {
           </div>
         </div>
       ) : null}
+
+      {isSettingsOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 px-4">
+          <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-md border border-moss/15 bg-linen p-5 shadow-panel">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">RAG 设置</h2>
+                <p className="mt-1 text-sm text-moss">分块参数对后续上传和重新入库生效。</p>
+              </div>
+              <button
+                className="rounded-md border border-moss/15 px-3 py-2 text-sm text-moss"
+                onClick={() => setIsSettingsOpen(false)}
+              >
+                关闭
+              </button>
+            </div>
+
+            <form className="space-y-5" onSubmit={handleSaveSettings}>
+              <section className="grid gap-3 md:grid-cols-3">
+                <NumberField
+                  label="TopK"
+                  min={1}
+                  max={20}
+                  value={settingsDraft.retrieval.top_k}
+                  onChange={(value) => updateSettingsDraft("retrieval.top_k", value)}
+                />
+                <NumberField
+                  label="相似度阈值"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={settingsDraft.retrieval.min_similarity}
+                  onChange={(value) => updateSettingsDraft("retrieval.min_similarity", value)}
+                />
+                <NumberField
+                  label="Temperature"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={settingsDraft.generation.temperature}
+                  onChange={(value) => updateSettingsDraft("generation.temperature", value)}
+                />
+              </section>
+
+              <section className="grid gap-3 md:grid-cols-3">
+                <NumberField
+                  label="Chunk Size"
+                  min={100}
+                  max={3000}
+                  value={settingsDraft.chunking.chunk_size}
+                  onChange={(value) => updateSettingsDraft("chunking.chunk_size", value)}
+                />
+                <NumberField
+                  label="Overlap"
+                  min={0}
+                  max={1000}
+                  value={settingsDraft.chunking.chunk_overlap}
+                  onChange={(value) => updateSettingsDraft("chunking.chunk_overlap", value)}
+                />
+                <NumberField
+                  label="最小分块"
+                  min={20}
+                  max={1000}
+                  value={settingsDraft.chunking.min_chunk_size}
+                  onChange={(value) => updateSettingsDraft("chunking.min_chunk_size", value)}
+                />
+              </section>
+
+              <section className="grid gap-3 md:grid-cols-2">
+                <NumberField
+                  label="Max Tokens"
+                  min={100}
+                  max={8000}
+                  value={settingsDraft.generation.max_tokens}
+                  onChange={(value) => updateSettingsDraft("generation.max_tokens", value)}
+                />
+                <div className="grid grid-cols-2 gap-2 rounded-md border border-moss/15 bg-white/70 p-3">
+                  <ToggleField
+                    label="严格拒答"
+                    checked={settingsDraft.retrieval.strict_refusal}
+                    onChange={(value) => updateSettingsDraft("retrieval.strict_refusal", value)}
+                  />
+                  <ToggleField
+                    label="章节路径"
+                    checked={settingsDraft.chunking.enable_section_path}
+                    onChange={(value) => updateSettingsDraft("chunking.enable_section_path", value)}
+                  />
+                  <ToggleField
+                    label="Hybrid"
+                    checked={settingsDraft.retrieval.enable_hybrid_search}
+                    onChange={(value) => updateSettingsDraft("retrieval.enable_hybrid_search", value)}
+                  />
+                  <ToggleField
+                    label="Rerank"
+                    checked={settingsDraft.retrieval.enable_rerank}
+                    onChange={(value) => updateSettingsDraft("retrieval.enable_rerank", value)}
+                  />
+                </div>
+              </section>
+
+              {settingsMessage ? (
+                <div className="rounded-md border border-reed bg-white/70 px-3 py-2 text-sm text-moss">{settingsMessage}</div>
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-moss/15 px-3 py-2 text-sm text-moss"
+                  onClick={() => settingsQuery.data && setSettingsDraft(settingsQuery.data)}
+                >
+                  还原
+                </button>
+                <button
+                  className="rounded-md bg-moss px-4 py-2 text-sm font-medium text-white disabled:bg-moss/40"
+                  disabled={isSavingSettings}
+                >
+                  {isSavingSettings ? "保存中..." : "保存设置"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </main>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="block rounded-md border border-moss/15 bg-white/70 p-3 text-sm">
+      <span className="text-moss">{label}</span>
+      <input
+        className="mt-2 w-full rounded-md border border-moss/15 bg-white px-3 py-2 outline-none focus:border-moss"
+        max={max}
+        min={min}
+        step={step}
+        type="number"
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
+function ToggleField({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-3 rounded-md border border-reed bg-linen/50 px-3 py-2 text-sm text-moss">
+      <span>{label}</span>
+      <input className="h-4 w-4 accent-moss" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+    </label>
+  );
+}
+
+function FormattedAnswer({ content }: { content: string }) {
+  const blocks = content
+    .replace(/\r\n/g, "\n")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  if (!blocks.length) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-3 text-sm leading-7">
+      {blocks.map((block, blockIndex) => {
+        const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+        const isBulletList = lines.length > 1 && lines.every((line) => /^[-*]\s+/.test(line));
+        const isNumberedList = lines.length > 1 && lines.every((line) => /^\d+[.、]\s*/.test(line));
+
+        if (isBulletList) {
+          return (
+            <ul key={blockIndex} className="space-y-2 pl-1">
+              {lines.map((line, lineIndex) => (
+                <li key={lineIndex} className="flex gap-2">
+                  <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-moss/70" />
+                  <span>{renderInlineMarkdown(line.replace(/^[-*]\s+/, ""))}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (isNumberedList) {
+          return (
+            <ol key={blockIndex} className="space-y-2">
+              {lines.map((line, lineIndex) => (
+                <li key={lineIndex} className="grid grid-cols-[28px_1fr] gap-2">
+                  <span className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-md bg-moss/10 text-xs font-semibold text-moss">
+                    {lineIndex + 1}
+                  </span>
+                  <span>{renderInlineMarkdown(line.replace(/^\d+[.、]\s*/, ""))}</span>
+                </li>
+              ))}
+            </ol>
+          );
+        }
+
+        return (
+          <p key={blockIndex} className="text-ink/95">
+            {renderInlineMarkdown(lines.join("\n"))}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function renderInlineMarkdown(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={index} className="font-semibold text-ink">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return <span key={index}>{part}</span>;
+  });
+}
+
+function DebugMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-reed bg-linen/60 px-2 py-1.5">
+      <div className="text-moss">{label}</div>
+      <div className="mt-0.5 font-semibold text-ink">{value}</div>
+    </div>
   );
 }

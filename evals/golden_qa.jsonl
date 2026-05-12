@@ -1,4 +1,10 @@
-{"question":"新员工入职第一周需要完成哪些事项？","expected_sources":["员工手册"],"expected_keywords":["账号开通","设备领取","信息安全培训","试用期目标"],"category":"员工手册"}
-{"question":"出差报销需要提交哪些材料？","expected_sources":["报销制度"],"expected_keywords":["发票","行程单","出差审批记录","费用明细"],"category":"报销制度"}
-{"question":"公司核心协作时间是什么时候？","expected_sources":["员工手册"],"expected_keywords":["10:00","17:00","核心协作时间"],"category":"员工手册"}
-
+{"question":"新员工入职第一周需要完成哪些事项？","expected_sources":["员工手册"],"expected_sections":["入职流程"],"expected_keywords":["账号开通","设备领取","信息安全培训","试用期目标确认"],"expected_refusal":false,"category":"员工手册"}
+{"question":"公司核心协作时间是什么时候？","expected_sources":["员工手册"],"expected_sections":["工作时间"],"expected_keywords":["10:00","17:00","核心协作时间"],"expected_refusal":false,"category":"员工手册"}
+{"question":"员工可以把内部文档上传到外部平台吗？","expected_sources":["员工手册"],"expected_sections":["行为规范"],"expected_keywords":["信息安全","客户数据保护","未经批准"],"expected_refusal":false,"category":"员工手册"}
+{"question":"出差报销需要提交哪些材料？","expected_sources":["报销制度"],"expected_sections":["差旅报销"],"expected_keywords":["发票","行程单","出差审批记录","费用明细"],"expected_refusal":false,"category":"报销制度"}
+{"question":"出差结束后多久内要提交报销申请？","expected_sources":["报销制度"],"expected_sections":["差旅报销"],"expected_keywords":["7 个工作日","提交报销申请"],"expected_refusal":false,"category":"报销制度"}
+{"question":"市内交通费用报销需要说明什么？","expected_sources":["报销制度"],"expected_sections":["交通报销"],"expected_keywords":["出行事由","起止地点","关联客户","项目"],"expected_refusal":false,"category":"报销制度"}
+{"question":"餐费报销需要补充哪些说明？","expected_sources":["报销制度"],"expected_sections":["餐补规则"],"expected_keywords":["业务背景","对应发票","客户拜访","项目加班"],"expected_refusal":false,"category":"报销制度"}
+{"question":"公司年会抽奖一等奖是什么？","expected_sources":[],"expected_sections":[],"expected_keywords":[],"expected_refusal":true,"category":"拒答"}
+{"question":"员工股票期权怎么归属？","expected_sources":[],"expected_sections":[],"expected_keywords":[],"expected_refusal":true,"category":"拒答"}
+{"question":"公司食堂早餐几点开始？","expected_sources":[],"expected_sections":[],"expected_keywords":[],"expected_refusal":true,"category":"拒答"}

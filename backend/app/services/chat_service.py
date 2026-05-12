@@ -85,7 +85,28 @@ async def _stream_chat_events(
             )
 
             best_score = retrieved_chunks[0].score if retrieved_chunks else 0.0
-            if app_settings.retrieval.strict_refusal and best_score < app_settings.retrieval.min_similarity:
+            should_refuse = app_settings.retrieval.strict_refusal and best_score < app_settings.retrieval.min_similarity
+            yield sse_event(
+                "retrieval_debug",
+                {
+                    "top_k": app_settings.retrieval.top_k,
+                    "min_similarity": app_settings.retrieval.min_similarity,
+                    "strict_refusal": app_settings.retrieval.strict_refusal,
+                    "enable_hybrid_search": app_settings.retrieval.enable_hybrid_search,
+                    "enable_rerank": app_settings.retrieval.enable_rerank,
+                    "embedding_model": settings.dashscope_embedding_model,
+                    "generation_model": settings.deepseek_model,
+                    "best_score": round(best_score, 4),
+                    "refused": should_refuse,
+                    "will_call_llm": not should_refuse,
+                    "reason": (
+                        f"Top1 相似度 {best_score:.4f} 低于阈值 {app_settings.retrieval.min_similarity:.2f}，严格拒答生效。"
+                        if should_refuse
+                        else f"Top1 相似度 {best_score:.4f} 达到阈值，将调用生成模型。"
+                    ),
+                },
+            )
+            if should_refuse:
                 assistant_message = _save_assistant_message(
                     db,
                     conversation_id=conversation.id,
@@ -272,4 +293,3 @@ def _build_user_prompt(question: str, chunks: list[RetrievedChunk]) -> str:
         + "\n\n【用户问题】\n"
         + question
     )
-
