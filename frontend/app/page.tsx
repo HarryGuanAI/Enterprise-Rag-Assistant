@@ -526,6 +526,11 @@ export default function HomePage() {
                     Hybrid / Rerank：{retrievalDebug.enable_hybrid_search ? "开" : "关"} /{" "}
                     {retrievalDebug.enable_rerank ? "开" : "关"}
                   </div>
+                  <div>检索模式：{retrievalDebug.retrieval_mode ?? "vector"}</div>
+                  <div>
+                    候选：向量 {retrievalDebug.vector_candidates ?? 0} / 关键词{" "}
+                    {retrievalDebug.keyword_candidates ?? 0} / 入选 {retrievalDebug.fused_candidates ?? 0}
+                  </div>
                 </div>
               </section>
             ) : null}
@@ -536,6 +541,11 @@ export default function HomePage() {
                     <div className="text-sm font-medium">{item.title}</div>
                     <div className="mt-1 text-xs text-copper">
                       Top {item.rank} · 相似度 {item.score.toFixed(4)}
+                    </div>
+                    <div className="mt-1 text-xs text-moss">
+                      {item.source ?? "vector"}
+                      {typeof item.vector_score === "number" ? ` · 向量 ${item.vector_score.toFixed(4)}` : ""}
+                      {typeof item.keyword_score === "number" ? ` · 关键词 ${item.keyword_score.toFixed(4)}` : ""}
                     </div>
                     {item.section ? <div className="mt-1 text-xs text-moss">{item.section}</div> : null}
                     <p className="mt-3 line-clamp-6 text-sm leading-6 text-ink/85">{item.text}</p>

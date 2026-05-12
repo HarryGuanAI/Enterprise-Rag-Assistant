@@ -178,3 +178,25 @@
 | 前端 3002 跨域调用后端 | 补充本地开发 CORS 白名单 |
 | 命令行上传中文文件名可能乱码 | 后端增加 latin-1 -> UTF-8 文件名修正兜底 |
 | 短章节被最小长度过滤导致 0 chunks | 调整分块策略，短条款也保留为 chunk |
+# 2026-05-12 检索优化能力展示
+
+## 已完成
+
+- 将设置面板里的 `enable_hybrid_search` 从占位开关接入真实检索逻辑：向量召回之外增加关键词召回，支持中文短语与 n-gram 匹配，并按文档标题、章节路径、chunk 内容计算关键词分。
+- 实现向量候选和关键词候选融合排序，保留每条引用的 `vector_score`、`keyword_score` 和 `source`，便于前端调试和面试讲解。
+- 将 `enable_rerank` 接入轻量 Rerank：使用向量分与关键词覆盖做二次排序，不额外调用模型，控制成本和延迟。
+- 修正 Rerank 分数校准：Rerank 不降低已有向量置信度，避免把原本应回答的问题压到 `min_similarity=0.60` 以下。
+- SSE `retrieval_debug` 新增实际检索模式、向量候选数、关键词候选数和最终入选数；前端右侧调试面板同步展示。
+- 评测脚本新增 `--enable-hybrid-search` 和 `--enable-rerank` 参数，可以直接对比不同检索模式。
+- 已将 Hybrid Search、轻量 Rerank、面试讲法和验证结果合并到 `docs/interview-retrospective-2026-05-12.md`，避免面试讲解文档分散。
+
+## 验证记录
+
+| 检查项 | 结果 |
+|---|---|
+| 后端 Python 编译 | 通过：`python -m compileall backend\app` |
+| 前端生产构建 | 通过：`npm.cmd run build` |
+| backend Docker 重建 | 通过：`docker compose up -d --build backend` |
+| Hybrid + Rerank 容器自测 | 通过：返回 `mode=hybrid+rerank`，向量候选 20，关键词候选 9，最终入选 5 |
+| 纯向量评测 | 通过：10 条样例，检索命中率 1.00，拒答准确率 1.00 |
+| Hybrid + Rerank 评测 | 通过：10 条样例，检索命中率 1.00，拒答准确率 1.00 |

@@ -77,11 +77,15 @@ async def _stream_chat_events(
             query_embedding = DashScopeEmbeddingClient().embed_texts(db, [payload.question])[0]
 
             yield sse_event("status", {"message": "正在检索知识库..."})
-            retrieved_chunks = PgVectorRetriever().search(
+            retriever = PgVectorRetriever()
+            retrieved_chunks = retriever.search(
                 db,
                 knowledge_base_id=knowledge_base.id,
                 query_embedding=query_embedding,
+                query_text=payload.question,
                 top_k=app_settings.retrieval.top_k,
+                enable_hybrid_search=app_settings.retrieval.enable_hybrid_search,
+                enable_rerank=app_settings.retrieval.enable_rerank,
             )
 
             best_score = retrieved_chunks[0].score if retrieved_chunks else 0.0
@@ -94,6 +98,10 @@ async def _stream_chat_events(
                     "strict_refusal": app_settings.retrieval.strict_refusal,
                     "enable_hybrid_search": app_settings.retrieval.enable_hybrid_search,
                     "enable_rerank": app_settings.retrieval.enable_rerank,
+                    "retrieval_mode": retriever.last_stats.mode,
+                    "vector_candidates": retriever.last_stats.vector_candidates,
+                    "keyword_candidates": retriever.last_stats.keyword_candidates,
+                    "fused_candidates": retriever.last_stats.fused_candidates,
                     "embedding_model": settings.dashscope_embedding_model,
                     "generation_model": settings.deepseek_model,
                     "best_score": round(best_score, 4),
@@ -263,6 +271,9 @@ def _citation_payload(chunk: RetrievedChunk) -> dict:
         "section": chunk.section,
         "text": chunk.content[:500],
         "score": round(chunk.score, 4),
+        "vector_score": round(chunk.vector_score, 4),
+        "keyword_score": round(chunk.keyword_score, 4),
+        "source": chunk.source,
         "rank": chunk.rank,
     }
 

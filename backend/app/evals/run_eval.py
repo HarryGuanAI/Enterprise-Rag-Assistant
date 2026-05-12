@@ -74,7 +74,12 @@ def keyword_coverage(text: str, keywords: list[str]) -> float:
     return hits / len(keywords)
 
 
-def run_eval(dataset_path: Path) -> dict[str, Any]:
+def run_eval(
+    dataset_path: Path,
+    *,
+    enable_hybrid_search: bool | None = None,
+    enable_rerank: bool | None = None,
+) -> dict[str, Any]:
     _load_root_env()
 
     from app.db.session import SessionLocal
@@ -88,6 +93,10 @@ def run_eval(dataset_path: Path) -> dict[str, Any]:
 
     with SessionLocal() as db:
         app_settings = get_or_create_settings(db)
+        use_hybrid_search = (
+            app_settings.retrieval.enable_hybrid_search if enable_hybrid_search is None else enable_hybrid_search
+        )
+        use_rerank = app_settings.retrieval.enable_rerank if enable_rerank is None else enable_rerank
         knowledge_base = get_or_create_default_knowledge_base(db)
         embedder = DashScopeEmbeddingClient()
         retriever = PgVectorRetriever()
@@ -98,7 +107,10 @@ def run_eval(dataset_path: Path) -> dict[str, Any]:
                 db,
                 knowledge_base_id=knowledge_base.id,
                 query_embedding=query_embedding,
+                query_text=case.question,
                 top_k=app_settings.retrieval.top_k,
+                enable_hybrid_search=use_hybrid_search,
+                enable_rerank=use_rerank,
             )
             top1_score = chunks[0].score if chunks else 0.0
             refused = app_settings.retrieval.strict_refusal and top1_score < app_settings.retrieval.min_similarity
@@ -124,6 +136,7 @@ def run_eval(dataset_path: Path) -> dict[str, Any]:
                     "keyword_coverage": round(coverage, 4),
                     "top1_source": chunks[0].title if chunks else None,
                     "top1_section": chunks[0].section if chunks else None,
+                    "retrieval_mode": retriever.last_stats.mode,
                 }
             )
 
@@ -140,6 +153,9 @@ def run_eval(dataset_path: Path) -> dict[str, Any]:
         if non_refusal_rows
         else 0.0,
         "avg_top1_score": round(mean(row["top1_score"] for row in rows), 4) if rows else 0.0,
+        "retrieval_mode": use_hybrid_search
+        and (use_rerank and "hybrid+rerank" or "hybrid")
+        or (use_rerank and "vector+rerank" or "vector"),
     }
     return {"metrics": metrics, "rows": rows}
 
@@ -151,9 +167,15 @@ def main() -> None:
         default=str(Path(__file__).resolve().parents[3] / "evals" / "golden_qa.jsonl"),
         help="Path to golden QA jsonl.",
     )
+    parser.add_argument("--enable-hybrid-search", action="store_true", help="Override settings and enable hybrid search.")
+    parser.add_argument("--enable-rerank", action="store_true", help="Override settings and enable lightweight rerank.")
     args = parser.parse_args()
 
-    report = run_eval(Path(args.dataset))
+    report = run_eval(
+        Path(args.dataset),
+        enable_hybrid_search=True if args.enable_hybrid_search else None,
+        enable_rerank=True if args.enable_rerank else None,
+    )
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

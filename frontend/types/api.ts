@@ -42,6 +42,9 @@ export type ChatCitation = {
   section: string | null;
   text: string;
   score: number;
+  vector_score?: number;
+  keyword_score?: number;
+  source?: string;
   rank: number;
 };
 
@@ -51,6 +54,10 @@ export type RetrievalDebug = {
   strict_refusal: boolean;
   enable_hybrid_search: boolean;
   enable_rerank: boolean;
+  retrieval_mode?: string;
+  vector_candidates?: number;
+  keyword_candidates?: number;
+  fused_candidates?: number;
   embedding_model: string;
   generation_model: string;
   best_score: number;

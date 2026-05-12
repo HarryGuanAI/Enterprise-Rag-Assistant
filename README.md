@@ -74,3 +74,17 @@ docker compose up -d --build
 ```text
 上传文档 -> 异步入库 -> 向量检索 -> 严格拒答/回答生成 -> 引用来源展示
 ```
+## 检索优化展示
+
+当前检索链路已经支持三种可演示模式：
+
+- 纯向量检索：使用 DashScope `text-embedding-v4` 生成问题向量，通过 pgvector cosine distance 召回 TopK。
+- Hybrid Search：在向量召回之外增加关键词召回，对中文问题抽取短语和 n-gram，通过文档标题、章节路径和 chunk 内容做补充召回，再融合排序。
+- 轻量 Rerank：不额外调用模型，使用向量分、关键词覆盖和标题/章节命中做二次排序；同时保证 Rerank 不降低已有向量置信度，避免破坏严格拒答阈值。
+
+评测脚本支持显式对比不同检索模式：
+
+```bash
+python -m app.evals.run_eval --dataset ../evals/golden_qa.jsonl
+python -m app.evals.run_eval --dataset ../evals/golden_qa.jsonl --enable-hybrid-search --enable-rerank
+```
