@@ -9,12 +9,39 @@
 body {
   margin: 0;
   background:
-    linear-gradient(135deg, rgba(216, 226, 209, 0.55), transparent 38%),
-    linear-gradient(180deg, #fbf8ef 0%, #f3efe4 100%);
+    linear-gradient(135deg, rgba(216, 226, 209, 0.5), transparent 36%),
+    linear-gradient(180deg, #fcfbf6 0%, #f2eee3 100%);
   color: #17211b;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
 }
 
+::selection {
+  background: rgba(45, 83, 63, 0.16);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(45, 83, 63, 0.26);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(45, 83, 63, 0.4);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}

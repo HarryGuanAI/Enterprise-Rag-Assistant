@@ -1,98 +1,71 @@
 # Enterprise RAG Assistant：企业知识库智能问答助手
 
-> 当前开发进度：文档上传、解析、混合分块、DashScope Embedding 适配器、pgvector 检索器、DeepSeek 流式适配器、SSE 问答接口、登录和游客限制已接入。真实运行前需要在 `.env` 填写 `DASHSCOPE_API_KEY` 和 `DEEPSEEK_API_KEY`。
+**云舟知识库助手** 是一个面向企业内部知识库场景的 RAG 问答系统，用于展示 AI Agent / RAG 应用开发能力。项目支持企业文档上传、异步入库、Embedding、pgvector 检索、Hybrid Search、轻量 Rerank、严格拒答、引用来源展示、游客限额和 DeepSeek 流式回答。
 
-**云舟知识库助手** 是一个面向企业内部知识库场景的 RAG 问答系统。它支持上传企业文档、异步入库、向量检索、严格拒答、引用来源展示、游客配额限制和流式回答。
+这个项目的目标不是做一个简单聊天框，而是做一个可部署、可演示、可开源，并且能在面试中讲清楚工程取舍的企业级 LLM 应用。
 
-本项目用于 AI Agent / RAG 开发岗位求职展示，重点不是做一个玩具聊天框，而是展示一个可以部署、可以开源、可以讲清楚工程取舍的企业级大模型应用。
-
-## 核心功能
+## 功能亮点
 
 - 管理员登录与游客模式
-- 游客 2 次问答限制，避免公开演示消耗过多 API
+- 游客每日 2 次问答限制，控制公开演示成本
 - PDF / DOCX / Markdown / TXT 文档上传
-- 异步文档入库：解析、分块、Embedding、pgvector 存储
-- DeepSeek 流式回答
-- DashScope `text-embedding-v4` 文本向量化
+- 后台异步解析、混合分块、DashScope `text-embedding-v4` 向量化
 - PostgreSQL + pgvector 向量检索
-- 严格拒答：知识库无依据时不让模型自由发挥
-- 引用来源展示：回答必须可追溯
-- RAG 设置面板：TopK、阈值、分块参数、Rerank/Hybrid 开关
-- 基础评测集：检索命中 + 答案关键词覆盖
+- Hybrid Search：向量召回 + 关键词召回融合
+- 轻量 Rerank：不额外调用模型的二次排序
+- 严格拒答：低相关问题不调用 LLM，降低幻觉和成本
+- DeepSeek `deepseek-chat` SSE 流式回答
+- 回答生成中支持手动停止，避免输出卡住时用户只能等待
+- 引用来源、相似度分数、检索调试信息展示
+- 回答后展示引用标签，点击可打开文档预览并定位到引用段落
+- 37 条 golden QA 评测集，覆盖命中、拒答、关键词覆盖
+- Docker Compose 一键启动
 
 ## 技术栈
 
 | 层级 | 技术 |
 |---|---|
-| 前端 | Next.js、Tailwind CSS、shadcn/ui、TanStack Query |
-| 后端 | FastAPI、SQLAlchemy 2.x、Pydantic、Alembic |
+| 前端 | Next.js 14, React 18, Tailwind CSS, TanStack Query, lucide-react |
+| 后端 | FastAPI, SQLAlchemy 2.x, Pydantic, Alembic |
 | 数据库 | PostgreSQL + pgvector |
-| 生成模型 | DeepSeek API |
 | Embedding | DashScope `text-embedding-v4` |
+| 生成模型 | DeepSeek `deepseek-chat` |
 | 部署 | Docker Compose |
 
 ## 快速开始
 
-复制环境变量：
+1. 复制环境变量文件：
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env`，填入：
+2. 编辑 `.env`，至少填写：
 
 ```text
-DEEPSEEK_API_KEY
 DASHSCOPE_API_KEY
+DEEPSEEK_API_KEY
 ADMIN_PASSWORD
 JWT_SECRET_KEY
 ```
 
-启动服务：
+3. 启动服务：
 
 ```bash
 docker compose up -d --build
 ```
 
-访问：
+4. 访问：
 
 - 前端：http://localhost:3000
 - 后端 API：http://localhost:8000
 - API 文档：http://localhost:8000/docs
 
-## 项目文档
-
-- [产品需求说明](docs/product-requirements.md)
-- [架构设计](docs/architecture.md)
-- [任务计划](task_plan.md)
-- [进度记录](progress.md)
-
-## 当前状态
-
-项目正在从脚手架开始逐步实现。第一阶段目标是跑通：
-
-```text
-上传文档 -> 异步入库 -> 向量检索 -> 严格拒答/回答生成 -> 引用来源展示
-```
-## 检索优化展示
-
-当前检索链路已经支持三种可演示模式：
-
-- 纯向量检索：使用 DashScope `text-embedding-v4` 生成问题向量，通过 pgvector cosine distance 召回 TopK。
-- Hybrid Search：在向量召回之外增加关键词召回，对中文问题抽取短语和 n-gram，通过文档标题、章节路径和 chunk 内容做补充召回，再融合排序。
-- 轻量 Rerank：不额外调用模型，使用向量分、关键词覆盖和标题/章节命中做二次排序；同时保证 Rerank 不降低已有向量置信度，避免破坏严格拒答阈值。
-
-评测脚本支持显式对比不同检索模式：
-
-```bash
-python -m app.evals.run_eval --dataset ../evals/golden_qa.jsonl
-python -m app.evals.run_eval --dataset ../evals/golden_qa.jsonl --enable-hybrid-search --enable-rerank
-```
 ## 样例知识库
 
-`sample_docs/` 提供了一组可直接上传或导入的虚构企业文档，覆盖员工手册、报销制度、休假制度、IT 服务、产品 FAQ、客服工单、销售合同和数据安全规范。它们用于本地演示、RAG 评测和面试讲解，不包含真实公司数据。
+`sample_docs/` 提供了一组虚构企业文档，覆盖员工手册、报销制度、休假制度、IT 服务、产品 FAQ、客服工单、销售合同和数据安全规范。这些文档用于本地演示、RAG 评测和面试讲解，不包含真实公司数据。
 
-可以通过管理员界面逐个上传，也可以使用脚本批量导入：
+可以通过管理员界面逐个上传，也可以批量导入：
 
 ```bash
 docker compose run --rm \
@@ -100,4 +73,75 @@ docker compose run --rm \
   backend python -m app.evals.ingest_sample_docs --sample-dir /app/sample_docs
 ```
 
-评测集位于 `evals/golden_qa.jsonl`，当前包含 37 条样例问题。
+Windows PowerShell 可以使用一行版：
+
+```powershell
+docker compose run --rm -v "${PWD}/sample_docs:/app/sample_docs" backend python -m app.evals.ingest_sample_docs --sample-dir /app/sample_docs
+```
+
+该命令会调用 DashScope Embedding，因此需要 `.env` 中已经配置 `DASHSCOPE_API_KEY`。
+
+## 运行评测
+
+纯向量基线：
+
+```bash
+docker compose run --rm \
+  -v "./evals:/app/evals" \
+  -v "./backend/app/evals:/app/app/evals" \
+  backend python -m app.evals.run_eval --dataset /app/evals/golden_qa.jsonl --disable-hybrid-search --disable-rerank
+```
+
+PowerShell：
+
+```powershell
+docker compose run --rm -v "${PWD}/evals:/app/evals" -v "${PWD}/backend/app/evals:/app/app/evals" backend python -m app.evals.run_eval --dataset /app/evals/golden_qa.jsonl --disable-hybrid-search --disable-rerank
+```
+
+Hybrid Search + 轻量 Rerank：
+
+```bash
+docker compose run --rm \
+  -v "./evals:/app/evals" \
+  -v "./backend/app/evals:/app/app/evals" \
+  backend python -m app.evals.run_eval --dataset /app/evals/golden_qa.jsonl --enable-hybrid-search --enable-rerank
+```
+
+PowerShell：
+
+```powershell
+docker compose run --rm -v "${PWD}/evals:/app/evals" -v "${PWD}/backend/app/evals:/app/app/evals" backend python -m app.evals.run_eval --dataset /app/evals/golden_qa.jsonl --enable-hybrid-search --enable-rerank
+```
+
+当前 37 条样例中，纯向量模式和 Hybrid + Rerank 模式的检索命中率、拒答准确率、关键词覆盖均为 `1.00`。
+
+## 面试讲法
+
+可以用这一条主线介绍项目：
+
+> 我做了一个企业知识库 RAG 助手。管理员上传内部制度文档后，系统会解析、分块、向量化并写入 PostgreSQL + pgvector。用户提问时，系统先做向量检索，可选 Hybrid Search 和 Rerank，再根据 Top1 相似度做严格拒答。命中可靠上下文时，系统把引用片段拼进 Prompt，调用 DeepSeek 流式生成答案，并在右侧展示引用来源和检索调试信息。
+
+重点可以展开：
+
+- 为什么第一版不用 LangChain：为了把 RAG 关键环节拆开实现，便于理解和调试。
+- 为什么要严格拒答：知识库依据不足时不让模型自由发挥，同时节省 LLM 成本。
+- 为什么做 Hybrid Search：向量召回负责语义泛化，关键词召回补足专有名词和制度原文匹配。
+- 为什么做轻量 Rerank：先用低成本方式展示召回和精排的分层设计，后续可替换为模型 Rerank。
+- 为什么做评测集：RAG 优化不能只靠感觉，要用 golden QA 看命中率、拒答准确率和关键词覆盖。
+
+## 文档
+
+- [架构设计](docs/architecture.md)
+- [产品需求](docs/product-requirements.md)
+- [部署说明](docs/deployment.md)
+- [面试演示脚本](docs/demo-script.md)
+- [复盘与面试准备](docs/interview-retrospective-2026-05-12.md)
+- [开源前安全检查](docs/security-and-open-source-checklist.md)
+- [评测说明](evals/README.md)
+
+## 安全提醒
+
+- 不要提交 `.env`、真实 API Key、上传文件或生产数据。
+- 本项目曾在本地开发过程中使用真实 Key，正式开源或部署前应重新生成 Key 并废弃旧 Key。
+- 公开演示前请修改 `ADMIN_PASSWORD`、`JWT_SECRET_KEY` 和数据库密码。
+- 样例文档均为虚构资料，不要把真实客户合同、员工信息或内部机密放进公开仓库。

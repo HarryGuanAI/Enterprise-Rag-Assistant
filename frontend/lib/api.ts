@@ -73,6 +73,7 @@ export async function streamSsePost(
     onEvent: (event: string, data: Record<string, unknown>) => void;
   },
   token?: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
@@ -81,6 +82,7 @@ export async function streamSsePost(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!response.ok || !response.body) {
