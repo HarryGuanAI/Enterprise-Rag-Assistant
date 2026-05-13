@@ -1,17 +1,17 @@
 # Enterprise RAG Assistant
 
-企业知识库智能问答助手，也叫 **云舟知识库助手**。这是一个面向 AI Agent / RAG 开发岗位作品集的企业级 RAG 应用示例，覆盖文档入库、向量检索、Hybrid Search、轻量 Rerank、严格拒答、引用溯源、多轮对话、游客限额、评测闭环和云服务器部署。
+**Enterprise RAG Assistant（云舟知识库助手）** 是一个面向企业内部知识库场景的开源 RAG 应用。系统支持多格式文档上传、异步解析入库、DashScope Embedding、PostgreSQL/pgvector 检索、Hybrid Search、轻量 Rerank、严格拒答、引用溯源、多轮对话、游客限额和 Docker Compose 部署。
 
-项目目标不是做一个简单聊天框，而是展示一个可部署、可演示、可开源、能讲清楚工程取舍的企业知识库助手。
+项目关注 RAG 应用在真实业务环境中的工程完整性：检索结果可追溯、回答边界可控制、效果可评测、服务可部署、运维有安全边界。
 
-## 在线演示
+## 在线体验
 
-- 演示地址：http://117.72.45.27
+- 访问地址：http://117.72.45.27
 - 健康检查：http://117.72.45.27/health
-- 演示数据：8 份虚构企业文档，36 个 chunks
-- 线上评测：37 条 golden QA，Hybrid + Rerank 模式下检索命中率、拒答准确率、关键词覆盖均为 `1.00`
+- 示例数据：8 份虚构企业文档，36 个 chunks
+- 评测结果：37 条 golden QA，Hybrid + Rerank 模式下检索命中率、拒答准确率、关键词覆盖均为 `1.00`
 
-说明：公网演示环境只导入 `sample_docs/` 中的虚构资料，不包含真实业务数据。演示环境可能因成本控制或维护临时不可用，本地 Docker Compose 部署方式见下文。
+说明：在线环境只导入 `sample_docs/` 中的虚构资料，不包含真实业务数据。服务可能因成本控制或维护临时不可用，本地 Docker Compose 部署方式见下文。
 
 ## 功能特性
 
@@ -33,6 +33,17 @@
 - 点击引用标签打开全文预览，并滚动高亮到命中 chunk
 - 37 条 golden QA 评测集和评测脚本
 - Docker Compose 一键部署
+
+## 技术亮点
+
+- **自研轻量 RAG 编排**：显式实现解析、分块、Embedding、召回、拒答、Prompt 拼接和流式生成，便于排查和替换任意环节。
+- **Hybrid Search**：将向量语义召回和中文关键词召回融合，兼顾语义泛化、专有名词、数字和制度原文匹配。
+- **轻量 Rerank**：基于向量分、关键词覆盖和内容相关性二次排序，在不引入额外模型成本的前提下提升排序稳定性。
+- **严格拒答策略**：Top1 相似度不足或命中片段无法支撑当前问题时直接拒答，降低幻觉和无依据回答。
+- **多轮检索防污染**：只在明显追问时带入历史上下文，独立新问题按当前问题重新检索，避免历史问题污染召回。
+- **可追溯引用**：回答保存引用快照，前端支持引用标签、全文预览、命中 chunk 滚动和高亮。
+- **评测闭环**：提供 37 条 golden QA，统计检索命中率、拒答准确率、关键词覆盖和 Top1 分数。
+- **部署安全边界**：Docker Compose + Nginx 部署，公网只开放入口端口，数据库和内部服务不直接暴露。
 
 ## 技术栈
 
@@ -132,7 +143,7 @@ docker compose up -d --build
 - 后端健康检查：http://localhost:8000/health
 - 后端 API 文档：http://localhost:8000/docs
 
-## 样例知识库
+## 示例知识库
 
 `sample_docs/` 提供一组虚构企业文档，覆盖：
 
@@ -216,9 +227,9 @@ enterprise-rag-assistant/
 │   ├── components/
 │   ├── lib/
 │   └── types/
-├── sample_docs/             # 虚构企业样例知识库
+├── sample_docs/             # 虚构企业示例知识库
 ├── evals/                   # golden QA 评测集
-├── docs/                    # 架构、部署、演示、安全、运维文档
+├── docs/                    # 架构、部署、安全、运维文档
 └── docker-compose.yml
 ```
 
@@ -226,47 +237,28 @@ enterprise-rag-assistant/
 
 - 不要提交 `.env`、真实 API Key、上传文件、生产数据或日志密钥。
 - `.env.example` 只保留占位值，可安全提交。
-- 本项目开发过程中曾使用真实 Key，正式开源或长期公网部署前应重新生成 Key，并废弃旧 Key。
-- 公开演示前请修改 `ADMIN_PASSWORD`、`JWT_SECRET_KEY`、`POSTGRES_PASSWORD`。
-- 样例文档均为虚构资料，不要把真实客户合同、员工信息、财务数据或内部机密放进公开仓库。
+- 本项目开发过程中曾使用真实 Key，正式公开或长期公网部署前应重新生成 Key，并废弃旧 Key。
+- 生产部署前请修改 `ADMIN_PASSWORD`、`JWT_SECRET_KEY`、`POSTGRES_PASSWORD`。
+- 示例文档均为虚构资料，不要把真实客户合同、员工信息、财务数据或内部机密放进公开仓库。
 - 公网部署时不要直接暴露 PostgreSQL。
 
 开源前检查见 [docs/security-and-open-source-checklist.md](docs/security-and-open-source-checklist.md)。
 
-## 面试讲法
-
-可以用这一条主线介绍项目：
-
-> 我做了一个企业知识库 RAG 助手，并部署到了云服务器公网演示环境。管理员上传制度文档后，系统会解析、分块、向量化并写入 PostgreSQL + pgvector。用户提问时，系统先做向量检索，可选 Hybrid Search 和轻量 Rerank，再根据相似度和当前问题支持度做严格拒答。命中可靠上下文时，系统把引用片段拼进 Prompt，调用 DeepSeek 流式生成答案，并展示引用来源、全文预览和检索调试信息。
-
-重点可以展开：
-
-- 为什么第一版不用 LangChain：为了拆开 RAG 关键环节，便于理解、调试和面试讲解。
-- 为什么要严格拒答：知识库依据不足时不让模型自由发挥，同时节省 LLM 成本。
-- 为什么做 Hybrid Search：向量召回负责语义泛化，关键词召回补足专有名词、数字和制度原文匹配。
-- 为什么做轻量 Rerank：用低成本方式展示召回和精排的分层设计，后续可替换为模型 Rerank。
-- 为什么做多轮对话拒答修复：多轮 RAG 不能简单拼历史，否则历史上下文会污染独立新问题。
-- 为什么做意图识别：能力咨询和使用说明不需要走 RAG 链路，本地规则回答更快、更稳定、更省钱。
-- 为什么做评测集：RAG 优化不能只靠感觉，要用 golden QA 看命中率、拒答准确率和关键词覆盖。
-- 为什么部署到云服务器：展示从代码、模型调用、数据库、容器编排、反向代理到安全边界的完整工程能力。
-
 ## Roadmap
 
 - 接入域名和 HTTPS。
-- 补充 README 截图和演示 GIF。
-- 录制 3-5 分钟项目演示视频。
+- 补充产品截图和运行示例。
 - 增加 LangChain / LangGraph 对照版本。
 - 接入模型 Rerank 或本地 bge-reranker。
-- 增加多知识库和更完整的管理员审计能力。
-- 为长期公网演示增加更细粒度的速率限制和监控。
+- 增加多知识库、用户体系和权限审计。
+- 增加更细粒度的限流、监控和成本统计。
+- 支持更多文档解析能力，例如 OCR、表格抽取和结构化元数据。
 
 ## 文档
 
 - [架构设计](docs/architecture.md)
 - [部署说明](docs/deployment.md)
 - [运维维护手册](docs/maintenance.md)
-- [面试演示脚本](docs/demo-script.md)
-- [复盘与面试准备](docs/interview-retrospective-2026-05-12.md)
 - [开源前安全检查](docs/security-and-open-source-checklist.md)
 - [评测说明](evals/README.md)
 
