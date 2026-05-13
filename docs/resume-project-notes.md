@@ -76,4 +76,53 @@ Enterprise RAG Assistant：企业知识库智能问答系统
 - 开源 README 不写“求职”“面试”“演示项目”等字样，只展示技术能力和工程质量。
 - GitHub 开源前继续检查 `.env`、上传文件、日志、截图和提交历史，避免泄露真实密钥。
 - 开发过程中暴露过的 DashScope、DeepSeek Key 和服务器 root 密码，长期公开访问前应重新生成或修改并废弃旧凭据。
-- 下一步优先准备 README 截图/GIF、3-5 分钟讲解视频、域名和 HTTPS。
+- 域名 `airagcloud.online` 已申请，DNS 计划指向 `117.72.45.27`，当前处于备案流程中；备案通过后再切换 HTTPS 域名访问。
+- 下一步优先准备 README 截图/GIF、3-5 分钟讲解视频、域名 HTTPS 完成后的公开访问链接。
+
+## 7. 给简历优化 AI 的提示词
+
+```text
+你现在扮演一名资深 AI Agent / RAG 开发岗位简历顾问，请帮我优化个人简历中的项目经历。
+
+我的目标岗位：AI Agent 开发工程师 / RAG 应用开发工程师 / 大模型应用开发工程师。
+
+项目名称：Enterprise RAG Assistant / 云舟知识库助手
+
+项目定位：
+这是一个可部署、可演示、可开源的企业知识库 RAG 助手。它不是简单调用聊天 API，而是完整覆盖文档上传、异步解析、分块、Embedding、向量入库、混合检索、严格拒答、引用溯源、多轮对话、评测和云服务器部署。
+
+技术栈：
+- Frontend：Next.js 14、React 18、Tailwind CSS、TanStack Query、lucide-react
+- Backend：FastAPI、SQLAlchemy 2.x、Pydantic、Alembic
+- Database：PostgreSQL + pgvector
+- Embedding：DashScope text-embedding-v4，1024 维稠密向量
+- LLM：DeepSeek deepseek-chat，SSE 流式回答
+- Deployment：Docker Compose、Nginx、云服务器
+
+核心能力：
+- 支持 PDF、DOCX、Markdown、TXT 上传与异步入库
+- 文档解析后进行混合分块，并写入 pgvector
+- 使用 pgvector cosine similarity 做向量召回
+- 实现 Hybrid Search：向量召回 + 中文关键词/短语/n-gram 召回 + 融合排序
+- 实现轻量 Rerank：基于向量分、关键词覆盖、标题/章节命中和领域词覆盖二次排序
+- 严格拒答：Top1 相似度不足或命中片段无法支撑当前问题时，不调用 LLM，返回无依据提示
+- 引用溯源：回答带引用来源，可点击打开全文并高亮命中 chunk
+- 多轮对话：保存会话和历史消息，支持继续追问
+- 多轮防污染：只有明显追问才带历史进入检索；独立新问题只按当前问题检索
+- 能力咨询意图识别：“你能做什么”等问题走本地快路径，跳过 Embedding、检索和 LLM
+- 查询处理：当前不做 LLM Query Rewrite，但会做文本归一化、关键词抽取、追问识别和当前问题支持度校验
+- 词序鲁棒性：修复“薪酬绩效/绩效薪酬”这类中文短问题词序变化导致的误拒答
+- 游客限额、管理员登录、RAG 参数设置、检索调试面板、手动停止输出
+- 使用 11 份虚构企业制度样例文档覆盖 HR、报销、信息安全、销售合同、客服 SLA、采购付款、产品 FAQ、入转离、绩效薪酬、商务接待、研发发布
+- 建立 73 条 golden QA 评测集，覆盖制度细则、金额阈值、审批链路、异常场景和知识库外拒答
+- 最新 Hybrid + Rerank 评测结果：retrieval_hit_rate=1.00，refusal_accuracy=1.00，keyword_coverage_avg=1.00，avg_top1_score=0.7584
+- 已部署到云服务器，使用 Docker Compose 编排 PostgreSQL、FastAPI、Next.js，Nginx 反向代理；域名 airagcloud.online 已申请，备案中
+
+请基于以上信息帮我完成：
+1. 生成一版适合放在中文技术简历里的项目经历，要求 4-6 条 bullet，每条体现技术动作 + 结果/价值，避免空泛。
+2. 生成一版更适合 Boss 直聘/拉勾/猎聘项目描述的短版，控制在 150-250 字。
+3. 生成一版面试时 60 秒项目介绍，语言自然，不要像背稿。
+4. 生成一版“技术亮点”模块，突出 RAG 检索、Hybrid Search、严格拒答、评测闭环、部署安全。
+5. 帮我把措辞优化得像真实工程项目，不要夸大，不要写“精通”，不要写无法证明的数据。
+6. 注意：开源 README 里不要出现“求职”“面试”“演示项目”这些词；简历里可以突出“已开源/可在线访问/可部署”。
+```

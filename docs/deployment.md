@@ -253,6 +253,37 @@ docker compose run --rm \
 
 上线后常用维护命令见 [运维维护手册](maintenance.md)。
 
+### 8.1 域名接入状态
+
+计划接入域名：
+
+```text
+airagcloud.online
+www.airagcloud.online
+```
+
+当前域名在阿里云管理，DNS A 记录计划指向京东云服务器公网 IP：
+
+```text
+117.72.45.27
+```
+
+由于服务器在国内云厂商，域名访问需要完成备案。备案完成前，域名可能无法稳定访问或被云厂商拦截；此阶段仍以公网 IP 地址访问为准。
+
+服务器侧已经提前完成 Nginx `server_name` 配置：
+
+```text
+server_name airagcloud.online www.airagcloud.online 117.72.45.27;
+```
+
+备案通过后继续完成：
+
+1. 确认 DNS 解析返回 `117.72.45.27`。
+2. 使用 Certbot 为 `airagcloud.online` 和 `www.airagcloud.online` 申请 HTTPS 证书。
+3. 将 `.env` 中的公网 API 地址从 IP 切换到域名。
+4. 重新 `docker compose up -d --build`，确保 Next.js 构建阶段拿到新的 `NEXT_PUBLIC_API_BASE_URL`。
+5. 验证 `https://airagcloud.online`、`/health`、`/api/stats` 和问答链路。
+
 ## 9. 上线前配置建议
 
 公开演示或部署到云服务器前，建议按下面顺序检查：

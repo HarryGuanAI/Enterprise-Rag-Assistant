@@ -208,6 +208,62 @@ iptables -S DOCKER-USER
 - API Key 曾经在开发过程中暴露过，公网长期演示前应重新生成并废弃旧 Key。
 - 不要把 `.env`、`storage/uploads/`、真实业务文档或日志密钥提交到 Git。
 
+## 5.1 域名与 HTTPS 状态
+
+当前计划使用域名：
+
+```text
+airagcloud.online
+www.airagcloud.online
+```
+
+域名解析目标：
+
+```text
+117.72.45.27
+```
+
+当前状态：
+
+- 域名已在阿里云申请。
+- DNS A 记录计划指向京东云服务器公网 IP `117.72.45.27`。
+- 京东云备案仍在处理中；备案完成前，域名访问可能被云厂商拦截或解析表现不稳定。
+- 服务器 Nginx 已提前加入：
+  ```text
+  server_name airagcloud.online www.airagcloud.online 117.72.45.27;
+  ```
+- 当前可稳定访问地址仍以 `http://117.72.45.27` 为准。
+
+备案通过后的待办：
+
+1. 确认 DNS 公共解析结果：
+   ```bash
+   nslookup airagcloud.online 223.5.5.5
+   nslookup www.airagcloud.online 223.5.5.5
+   ```
+   两个结果都应返回 `117.72.45.27`。
+2. 确认 HTTP 域名访问：
+   ```bash
+   curl -I http://airagcloud.online
+   curl -I http://www.airagcloud.online
+   ```
+3. 配置 HTTPS 证书，建议使用 Let's Encrypt + Certbot。
+4. 将服务器 `.env` 中公网访问相关配置切换为域名，例如：
+   ```text
+   BACKEND_CORS_ORIGINS=https://airagcloud.online,https://www.airagcloud.online
+   NEXT_PUBLIC_API_BASE_URL=https://airagcloud.online
+   ```
+5. 重新构建前端并重启服务：
+   ```bash
+   cd /opt/enterprise-rag-assistant
+   docker compose up -d --build
+   ```
+6. 验证：
+   ```bash
+   curl -I https://airagcloud.online
+   curl -s https://airagcloud.online/api/stats
+   ```
+
 ## 6. 面试讲法
 
 可以这样讲部署和运维部分：
