@@ -23,6 +23,17 @@
 - 37 条 golden QA 评测集，覆盖命中、拒答、关键词覆盖
 - Docker Compose 一键启动
 
+## 当前部署状态
+
+项目已部署到一台 2 核 4GB 云服务器用于公网演示：
+
+- 演示地址：http://117.72.45.27
+- 健康检查：http://117.72.45.27/health
+- 当前样例知识库：8 份虚构企业文档，36 个 chunks
+- 上线后评测：37 条 golden QA，Hybrid + Rerank 模式下检索命中率、拒答准确率、关键词覆盖均为 `1.00`
+
+说明：公网演示环境只导入 `sample_docs/` 中的虚构资料，不包含真实业务数据。
+
 ## 技术栈
 
 | 层级 | 技术 |
@@ -138,6 +149,7 @@ docker compose run --rm -v "${PWD}/evals:/app/evals" -v "${PWD}/backend/app/eval
 - [架构设计](docs/architecture.md)
 - [产品需求](docs/product-requirements.md)
 - [部署说明](docs/deployment.md)
+- [运维维护手册](docs/maintenance.md)
 - [面试演示脚本](docs/demo-script.md)
 - [复盘与面试准备](docs/interview-retrospective-2026-05-12.md)
 - [开源前安全检查](docs/security-and-open-source-checklist.md)

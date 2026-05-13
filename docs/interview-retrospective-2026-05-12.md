@@ -1028,20 +1028,94 @@ python -m app.evals.run_eval --dataset ../evals/golden_qa.jsonl --enable-hybrid-
 
 ```text
 Enterprise RAG Assistant：企业知识库智能问答助手
-- 基于 Next.js + FastAPI + PostgreSQL/pgvector 构建企业知识库 RAG 系统，支持文档上传、异步解析、混合分块、向量入库、全文引用预览和 SSE 流式问答。
+- 基于 Next.js + FastAPI + PostgreSQL/pgvector 构建企业知识库 RAG 系统，并部署到云服务器公网演示环境，支持文档上传、异步解析、混合分块、向量入库、全文引用预览和 SSE 流式问答。
 - 接入 DashScope text-embedding-v4 与 DeepSeek Chat，实现严格拒答、引用溯源、检索调试、多轮对话和停止输出。
-- 实现 Hybrid Search 与轻量 Rerank，融合向量召回和中文关键词召回，并通过 37 条 golden QA 评测集验证检索命中率、拒答准确率和关键词覆盖。
-- 设计游客限额、管理员登录、能力咨询意图识别、模型调用统计和上线前安全检查，覆盖公开演示场景下的成本控制与安全边界。
+- 实现 Hybrid Search 与轻量 Rerank，融合向量召回和中文关键词召回，并通过 37 条 golden QA 评测集验证检索命中率、拒答准确率和关键词覆盖均为 1.00。
+- 设计游客限额、管理员登录、能力咨询意图识别、模型调用统计、Nginx 反向代理和容器端口收敛，覆盖公开演示场景下的成本控制、安全边界和部署运维。
 ```
 
-### 18.7 下一步：部署上线优先级
+### 18.7 下一步：求职展示材料优先级
 
-下一阶段不建议继续堆功能，优先做上线收口：
+下一阶段不建议继续堆功能，优先做求职展示收口：
 
-1. 轮换并废弃旧 API Key。
-2. 检查 `.env.example`、README、文档和 Git 状态。
-3. 准备云服务器 Docker Compose 部署。
-4. 配置域名、HTTPS、CORS 和 `NEXT_PUBLIC_API_BASE_URL`。
-5. 导入 `sample_docs/`。
-6. 跑 37 条评测，截图或记录结果。
-7. 录制 3-5 分钟演示 GIF/视频，放进 README 或求职材料。
+1. 修改曾暴露过的云服务器 root 密码，后续改用 SSH Key 登录。
+2. 准备域名和 HTTPS，把公网 IP 演示升级为域名演示。
+3. 截取 README 图片或 GIF：工作台首页、引用来源、检索调试、严格拒答、评测结果。
+4. 录制 3-5 分钟演示视频，按 `docs/demo-script.md` 展示完整链路。
+5. 准备简历项目描述和面试 1 分钟、3 分钟、8 分钟三种讲法。
+6. 开源前再次检查 `.env`、上传文件、日志、截图、提交历史没有真实密钥。
+
+## 19. 公网部署复盘：从可运行项目到可展示作品
+
+### 19.1 部署结果
+
+2026-05-13 已将项目部署到京东云服务器，公网演示地址：
+
+```text
+http://117.72.45.27
+```
+
+部署环境：
+
+- 云服务器：2 核 CPU、4GB 内存、60GB SSD、5Mbps 带宽。
+- 系统：Ubuntu 24.04 LTS。
+- 编排：Docker Compose。
+- 入口：Nginx 反向代理。
+- 服务：PostgreSQL + pgvector、FastAPI backend、Next.js frontend。
+
+上线后验证：
+
+- 前端首页返回 200。
+- `/health` 返回 200。
+- `/api/stats` 返回 8 份 ready 文档、36 个 chunks。
+- 8 份 `sample_docs/` 虚构企业文档导入成功。
+- 37 条 golden QA 在 Hybrid + Rerank 模式下评测通过：检索命中率 1.00，拒答准确率 1.00，关键词覆盖 1.00。
+
+面试讲法：
+
+> 这个项目不是只停留在本地 Demo，我已经把它部署到云服务器上，用 Docker Compose 编排前后端和 PostgreSQL，用 Nginx 做公网入口。上线后导入了虚构企业样例知识库，并跑了 37 条 golden QA 验证检索命中、拒答和关键词覆盖。
+
+### 19.2 部署中遇到的问题
+
+真实部署中遇到的工程问题：
+
+- 国内云服务器访问 Docker Hub 超时，导致 `pgvector/pgvector:pg16` 拉取失败。
+- 后端 Docker 构建时 `pip` 访问 `files.pythonhosted.org` 超时。
+- 前端 Dockerfile 假设存在 `public` 目录，但仓库初始没有该目录。
+- Next.js 的 `NEXT_PUBLIC_API_BASE_URL` 需要在构建阶段注入，否则生产包可能仍指向本地地址。
+- PostgreSQL 数据卷已经初始化后再修改 `POSTGRES_PASSWORD`，会导致后端密码认证失败。
+- Docker 发布端口需要额外关注，公网部署不能让 PostgreSQL 直接暴露。
+
+处理方式：
+
+- 配置 Docker 镜像加速器，并记录这是供应链信任边界取舍。
+- 后端 Dockerfile 增加 `PIP_INDEX_URL` build arg，默认使用阿里云 PyPI 镜像。
+- 补充 `frontend/public/.gitkeep`，保证 Docker 构建稳定。
+- 前端 Dockerfile 增加 `NEXT_PUBLIC_API_BASE_URL` build arg，Compose 构建时注入公网 API 地址。
+- 空数据库场景下删除 PostgreSQL 数据卷并用新密码重新初始化。
+- Compose 端口绑定收敛到 `127.0.0.1`，公网入口只走 Nginx；额外用 Docker `DOCKER-USER` 链阻断公网直连 `3000/8000/5432`。
+
+面试讲法：
+
+> 这次部署让我补齐了 LLM 应用从代码到上线的工程细节。比如国内服务器拉 Docker 镜像和 PyPI 依赖会超时，需要配置镜像源；前端环境变量要在 build 阶段注入；数据库密码和数据卷初始化有关；公网部署时要收敛容器端口，不能把 PostgreSQL 直接暴露出去。
+
+### 19.3 运维与安全讲法
+
+当前安全策略：
+
+- `.env` 只在服务器保存真实 Key，不提交 Git。
+- 游客每日 15 次问答，IP 日兜底 100 次。
+- 低相关问题严格拒答，不调用 DeepSeek。
+- Nginx 是公网入口，容器端口只绑定本机。
+- UFW 只放行 `22/80/443`。
+- Docker `DOCKER-USER` 链阻断公网直连内部容器端口。
+
+仍需完成：
+
+- 修改曾暴露过的云服务器 root 密码。
+- 长期演示改用 SSH Key 登录。
+- 配置域名与 HTTPS。
+
+面试讲法：
+
+> 我把公开演示的安全边界也考虑进去了：模型 Key 和管理员密码只在后端环境变量里；游客有限额；低相关问题不调用模型；数据库不暴露公网；公网入口统一走 Nginx。后续加域名和 HTTPS 后，就可以作为完整的在线作品展示。

@@ -132,7 +132,127 @@ docker compose up -d --build backend
 - 重新生成 API Key，废弃曾经暴露过的旧 Key
 - 确认 `.env`、`storage/uploads/`、真实业务文档没有进入 Git
 
-## 7. 上线前配置建议
+## 7. 云服务器部署建议
+
+下面是一台普通云服务器上的推荐部署路径，适合公网演示和面试项目展示。
+
+### 7.1 推荐拓扑
+
+```text
+Browser
+  |
+  | HTTPS
+  v
+Nginx / Caddy
+  |---------------------> frontend:3000
+  |
+  | /api, /health, /docs
+  v
+backend:8000
+  |
+  v
+postgres:5432  # 仅容器内访问，不暴露公网
+```
+
+推荐做法：
+
+- 用 Nginx 或 Caddy 负责 HTTPS、证书自动续期和反向代理。
+- 前端和后端可以使用同一个域名的不同路径，也可以使用两个子域名。
+- PostgreSQL 不要开放公网端口，只允许 Docker 网络内的 backend 访问。
+- 只把 `sample_docs/` 中的虚构资料导入演示环境。
+
+### 7.2 环境变量示例
+
+如果使用两个子域名：
+
+```text
+BACKEND_CORS_ORIGINS=https://rag.example.com
+NEXT_PUBLIC_API_BASE_URL=https://api-rag.example.com
+```
+
+如果使用同一个域名并由反向代理把 `/api` 转发到后端，则可以按实际代理规则设置：
+
+```text
+BACKEND_CORS_ORIGINS=https://rag.example.com
+NEXT_PUBLIC_API_BASE_URL=https://rag.example.com
+```
+
+无论哪种方式，公开部署前都必须换成新的强密码和新密钥：
+
+```text
+ADMIN_PASSWORD=新的管理员强密码
+JWT_SECRET_KEY=随机长密钥
+POSTGRES_PASSWORD=新的数据库密码
+DASHSCOPE_API_KEY=重新生成的新 Key
+DEEPSEEK_API_KEY=重新生成的新 Key
+```
+
+### 7.3 端口暴露建议
+
+当前 `docker-compose.yml` 默认只把容器端口绑定到服务器本机回环地址：
+
+- `127.0.0.1:3000:3000`
+- `127.0.0.1:8000:8000`
+- `127.0.0.1:5432:5432`
+
+公网部署时建议只开放 Nginx/Caddy 的 `80` 和 `443`，由反向代理访问本机的前端和后端端口。PostgreSQL 不应直接暴露公网。
+
+面试讲法：
+
+> 公网部署时我不会直接暴露数据库和后端容器端口，而是让容器只监听服务器本机地址。公网入口交给 Nginx/Caddy 做 HTTPS 和路由，PostgreSQL 只给后端访问。
+
+### 7.4 上线命令顺序
+
+```bash
+docker compose up -d --build
+docker compose ps
+curl http://localhost:8000/health
+```
+
+导入样例知识库：
+
+```bash
+docker compose run --rm \
+  -v "./sample_docs:/app/sample_docs" \
+  backend python -m app.evals.ingest_sample_docs --sample-dir /app/sample_docs
+```
+
+运行上线后评测：
+
+```bash
+docker compose run --rm \
+  -v "./evals:/app/evals" \
+  -v "./backend/app/evals:/app/app/evals" \
+  backend python -m app.evals.run_eval --dataset /app/evals/golden_qa.jsonl --enable-hybrid-search --enable-rerank
+```
+
+评测通过后，再录制 README 截图、GIF 或 3-5 分钟演示视频。
+
+## 8. 京东云上线记录
+
+当前公网演示环境已经部署到京东云服务器：
+
+- 实例规格：2 核 CPU、4GB 内存、60GB SSD、5Mbps 带宽
+- 系统：Ubuntu 24.04 LTS
+- 访问地址：http://117.72.45.27
+- 项目目录：`/opt/enterprise-rag-assistant`
+- 部署组件：Docker Compose、PostgreSQL + pgvector、FastAPI、Next.js、Nginx
+
+上线过程中完成的配置：
+
+- 安装 Docker、Docker Compose、Nginx。
+- 配置 Docker 镜像加速器，解决国内服务器拉取 Docker Hub 镜像超时问题。
+- 配置 `PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple`，解决后端镜像构建时 pip 下载超时问题。
+- Nginx 监听公网 `80`，转发 `/` 到前端，转发 `/api`、`/health`、`/docs` 到后端。
+- Docker Compose 端口只绑定 `127.0.0.1`，避免公网直连容器端口。
+- UFW 只放行 `22`、`80`、`443`。
+- 额外通过 Docker `DOCKER-USER` 链阻断公网直连 `3000`、`8000`、`5432`。
+- 导入 8 份 `sample_docs/` 虚构文档，生成 36 个 chunks。
+- 运行 37 条 golden QA，Hybrid + Rerank 模式下检索命中率、拒答准确率、关键词覆盖均为 `1.00`。
+
+上线后常用维护命令见 [运维维护手册](maintenance.md)。
+
+## 9. 上线前配置建议
 
 公开演示或部署到云服务器前，建议按下面顺序检查：
 
@@ -166,13 +286,13 @@ docker compose up -d --build backend
 
 5. 端口与反向代理
 
-   Docker Compose 默认暴露：
+   Docker Compose 默认只绑定服务器本机端口：
 
-   - 前端：`3000`
-   - 后端：`8000`
-   - PostgreSQL：`5432`
+   - 前端：`127.0.0.1:3000`
+   - 后端：`127.0.0.1:8000`
+   - PostgreSQL：`127.0.0.1:5432`
 
-   公网部署时建议只暴露前端和后端 API，PostgreSQL 不直接暴露公网。可用 Nginx/Caddy 做 HTTPS 和反向代理。
+   公网部署时只开放 Nginx/Caddy 的 `80` 和 `443`，PostgreSQL 不直接暴露公网。
 
 6. 上线后验证
 

@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rag_password}
       POSTGRES_DB: ${POSTGRES_DB:-enterprise_rag}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,13 +19,15 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple}
     container_name: enterprise-rag-backend
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-rag_user}:${POSTGRES_PASSWORD:-rag_password}@postgres:5432/${POSTGRES_DB:-enterprise_rag}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./storage/uploads:/app/storage/uploads
     depends_on:
@@ -35,14 +37,15 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
     container_name: enterprise-rag-frontend
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - backend
 
 volumes:
   postgres_data:
-

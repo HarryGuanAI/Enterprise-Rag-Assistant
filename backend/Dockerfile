@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
+RUN pip install --no-cache-dir -i ${PIP_INDEX_URL} -r requirements.txt
 
 COPY . .
 

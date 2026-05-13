@@ -1,5 +1,49 @@
 # Enterprise RAG Assistant 进度记录
 
+## 2026-05-13 京东云公网部署与上线验证
+
+### 已完成
+- 在京东云 2 核 4GB / 60GB SSD / 5Mbps 云服务器上完成公网部署。
+- 服务器系统为 Ubuntu 24.04 LTS，项目目录为 `/opt/enterprise-rag-assistant`。
+- 安装并启用 Docker、Docker Compose、Nginx。
+- 配置 Docker 镜像加速器，解决国内服务器拉取 Docker Hub 镜像超时问题。
+- 后端 Docker 构建增加 `PIP_INDEX_URL` build arg，默认使用阿里云 PyPI 镜像，解决 pip 下载超时问题。
+- 前端 Docker 构建增加 `NEXT_PUBLIC_API_BASE_URL` build arg，确保生产构建能指向公网 API 地址。
+- 补充 `frontend/public/.gitkeep`，避免前端 Dockerfile 在没有 public 目录时复制失败。
+- Nginx 配置公网 `80` 入口：`/` 转发到前端，`/api`、`/health`、`/docs` 转发到后端。
+- Docker Compose 端口改为只绑定 `127.0.0.1`：前端 `3000`、后端 `8000`、PostgreSQL `5432` 不直接监听公网。
+- 启用 UFW，仅放行 `22`、`80`、`443`。
+- 增加 Docker `DOCKER-USER` 防护规则，阻断公网直连 `3000`、`8000`、`5432`，并创建 systemd 服务保证规则在 Docker 启动后恢复。
+- 服务器 `.env` 已由用户自行填入新 Key 和新密码；没有在聊天或文档中展示真实 Key。
+- 修改 PostgreSQL 密码后，删除空数据卷并重新初始化数据库。
+- 导入 8 份 `sample_docs/` 虚构企业样例文档，生成 36 个 chunks。
+- 运行 37 条 golden QA，Hybrid + Rerank 模式评测通过。
+
+### 当前公网地址
+- 前端页面：http://117.72.45.27
+- 健康检查：http://117.72.45.27/health
+- API 统计：http://117.72.45.27/api/stats
+
+### 上线验证记录
+| 检查项 | 结果 |
+|---|---|
+| 前端公网访问 | 通过：HTTP 200，页面包含“云舟知识库助手” |
+| 后端健康检查 | 通过：`/health` 返回 200 |
+| API 统计 | 通过：`/api/stats` 返回 8 个文档、36 个 chunks、游客剩余 15/15 |
+| PostgreSQL | 通过：容器 healthy |
+| 样例知识库导入 | 通过：8 份文档全部入库 |
+| Hybrid + Rerank 评测 | 通过：37 条，检索命中率 1.00，拒答准确率 1.00，关键词覆盖 1.00，平均 Top1 分 0.7615 |
+
+### 安全提醒
+- 用户曾在聊天中暴露云服务器 root 密码，必须在京东云控制台修改 root 密码。
+- 长期演示建议改用 SSH Key 登录，并关闭 root 密码登录。
+- 真实 API Key 只保存在服务器 `.env`，不要写入 README、截图、提交信息或 issue。
+- 公开仓库前继续确认 `.env`、`storage/uploads/`、真实业务文档、日志密钥没有进入 Git。
+
+### 面试价值
+- 项目已经从“本地可演示”推进到“公网可访问、可部署、可运维”的状态。
+- 可以讲清楚 RAG 工程除了检索和生成，还包括云服务器部署、反向代理、环境变量管理、端口安全、镜像源问题处理和上线后评测。
+
 ## 2026-05-12 多轮对话拒答修复
 
 ### 已完成
