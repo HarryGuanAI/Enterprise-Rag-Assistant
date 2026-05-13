@@ -263,9 +263,3 @@ www.airagcloud.online
    curl -I https://airagcloud.online
    curl -s https://airagcloud.online/api/stats
    ```
-
-## 6. 面试讲法
-
-可以这样讲部署和运维部分：
-
-> 我已经把项目部署到一台 2 核 4GB 的云服务器上，使用 Docker Compose 编排 PostgreSQL、FastAPI 和 Next.js，用 Nginx 做公网反向代理。数据库、后端和前端容器端口只监听本机地址，公网只开放 80/443，避免 PostgreSQL 直接暴露。样例知识库覆盖 Markdown、TXT、DOCX、PDF 多种文档格式，并通过 golden QA 评测验证检索命中、拒答和关键词覆盖。

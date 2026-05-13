@@ -17,6 +17,9 @@ dev-server*.log
 .env
 .env.local
 
+# Local-only notes
+private_notes/
+
 # Runtime storage
 storage/uploads/
 

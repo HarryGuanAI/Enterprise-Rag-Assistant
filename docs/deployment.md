@@ -134,7 +134,7 @@ docker compose up -d --build backend
 
 ## 7. 云服务器部署建议
 
-下面是一台普通云服务器上的推荐部署路径，适合公网演示和面试项目展示。
+下面是一台普通云服务器上的推荐部署路径，适合公网运行和在线体验。
 
 ### 7.1 推荐拓扑
 
@@ -197,9 +197,7 @@ DEEPSEEK_API_KEY=重新生成的新 Key
 
 公网部署时建议只开放 Nginx/Caddy 的 `80` 和 `443`，由反向代理访问本机的前端和后端端口。PostgreSQL 不应直接暴露公网。
 
-面试讲法：
-
-> 公网部署时我不会直接暴露数据库和后端容器端口，而是让容器只监听服务器本机地址。公网入口交给 Nginx/Caddy 做 HTTPS 和路由，PostgreSQL 只给后端访问。
+公网部署时不应直接暴露数据库和后端容器端口。推荐让容器只监听服务器本机地址，公网入口交给 Nginx/Caddy 做 HTTPS 和路由，PostgreSQL 仅允许后端服务访问。
 
 ### 7.4 上线命令顺序
 
@@ -226,7 +224,7 @@ docker compose run --rm \
   backend python -m app.evals.run_eval --dataset /app/evals/golden_qa.jsonl --enable-hybrid-search --enable-rerank
 ```
 
-评测通过后，再录制 README 截图、GIF 或 3-5 分钟演示视频。
+评测通过后，可以补充 README 截图、GIF 或在线运行示例。
 
 ## 8. 京东云上线记录
 
