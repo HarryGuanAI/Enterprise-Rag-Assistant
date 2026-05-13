@@ -263,6 +263,34 @@ enterprise-rag-assistant/
 - [开源前安全检查](docs/security-and-open-source-checklist.md)
 - [评测说明](evals/README.md)
 
+## 检索与查询处理
+
+### Embedding 与向量检索
+
+系统当前使用 DashScope `text-embedding-v4` 作为稠密向量模型，输出维度为 `1024`。后端会将文档分块和用户问题都编码为 1024 维 float 向量，并写入 PostgreSQL + pgvector 的 `vector(1024)` 字段。检索时使用 pgvector 的 cosine distance，业务侧统一换算为相似度分数 `1 - distance`。
+
+### Hybrid Search
+
+Hybrid Search 不是简单只依赖 Embedding，也不是引入额外搜索引擎，而是在 PostgreSQL 内完成两路召回与融合：
+
+- 向量召回：使用 pgvector cosine similarity 找到语义相近的 chunks。
+- 关键词召回：从中文问题中抽取连续短语和 2/3/4-gram，同时保留英文、数字和专有词，在文档标题、章节路径和 chunk 内容中做关键词匹配。
+- 结果融合：按 chunk 去重后合并向量分、关键词分和召回排名。向量与关键词同时命中的片段会获得更高置信度；仅关键词命中的片段会设置更保守的分数上限，避免绕过严格拒答。
+- 轻量 Rerank：基于向量分、关键词覆盖、标题/章节命中和领域词覆盖做二次排序，不额外调用大模型或 rerank 模型。
+
+这套实现兼顾了语义泛化和制度原文匹配：自然语言改写可以依赖向量召回，制度名、金额阈值、缩写、流程节点等更适合通过关键词召回补足。
+
+### Query 处理
+
+系统目前不做 LLM Query Rewrite，也不会在每次提问前额外调用大模型改写问题。用户原始输入进入 RAG 链路前会做轻量规则处理：
+
+- 能力咨询识别：例如“你能做什么”“支持哪些格式”会直接返回产品能力说明，跳过 Embedding、检索和 DeepSeek。
+- 多轮追问判断：只有“这个呢”“上面那条”“继续说”等明显追问才把最近历史拼入检索 query；独立新问题只使用当前问题检索，避免历史主题污染。
+- 文本归一化：统一大小写、空白和常见中文标点，便于规则判断和关键词抽取。
+- 关键词抽取：提取英文/数字 token、中文连续短语和 n-gram，用于 Hybrid Search 的关键词召回与 rerank。
+- 当前问题支持度校验：即使检索分数过线，也会检查命中片段是否能支撑当前问题；支撑不足时严格拒答并返回空引用。
+- 领域词顺序容错：针对“绩效薪酬/薪酬绩效”这类词序变化，增加领域词覆盖判断，降低中文短问题因词序变化导致的误拒答。
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

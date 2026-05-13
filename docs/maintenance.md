@@ -102,6 +102,46 @@ keyword_coverage_avg: 1.00
 avg_top1_score: 0.7615
 ```
 
+最新本地回归记录（2026-05-13）：
+
+```text
+total: 73
+retrieval_mode: hybrid+rerank
+retrieval_hit_rate: 1.00
+refusal_accuracy: 1.00
+keyword_coverage_avg: 1.00
+avg_top1_score: 0.7584
+```
+
+## 3.1 检索链路维护说明
+
+当前 Embedding 使用 DashScope `text-embedding-v4`，属于稠密向量模型，后端固定请求 `1024` 维输出，数据库字段为 `vector(1024)`。向量检索使用 pgvector cosine distance，业务分数按 `1 - distance` 计算。
+
+Hybrid Search 的实现方式：
+
+- 向量召回：使用用户问题向量在 pgvector 中检索语义相近 chunks。
+- 关键词召回：从问题中提取英文/数字 token、中文连续短语和 2/3/4-gram，在文件名、章节路径和 chunk 内容中匹配。
+- 融合排序：按 chunk id 去重，保留向量分与关键词分，并结合两路召回排名做融合排序。
+- 分数控制：向量和关键词都命中的片段会加权提升；仅关键词命中的片段设置保守上限，避免弱匹配绕过严格拒答。
+- 轻量 Rerank：基于向量分、关键词覆盖、标题/章节命中、内容相关性和领域词覆盖做二次排序，不额外调用 rerank 模型。
+
+Query 处理策略：
+
+- 当前系统不做 LLM Query Rewrite，不会为了改写 query 额外调用大模型。
+- 能力咨询类问题直接走本地回答，跳过 Embedding、检索和 DeepSeek。
+- 只有明显追问才带入最近历史作为检索上下文；独立新问题只按当前问题检索。
+- 输入会做空白、大小写和常见标点归一化，并抽取关键词供 Hybrid Search 使用。
+- 检索后会做当前问题支持度校验；命中片段无法支撑当前问题时严格拒答。
+- 针对“薪酬绩效/绩效薪酬”一类中文领域词顺序变化，系统增加了领域词覆盖容错，避免短问题因词序变化被误拒答。
+
+排查检索异常时优先看右侧 retrieval_debug：
+
+- `Top1` 是否低于阈值 `min_similarity`。
+- `候选：向量 / 关键词 / 入选` 是否说明关键词召回没有命中。
+- 命中来源是否来自目标制度文档。
+- `will_call_llm` 是否为 `false`，如果为 false 说明严格拒答拦截生效。
+- 对同义问法或词序变化问题，优先用 golden QA 增补一条用例，再调整召回或 rerank 规则。
+
 ## 4. 环境变量维护
 
 真实配置文件位于服务器：
