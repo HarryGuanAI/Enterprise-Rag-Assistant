@@ -21,11 +21,11 @@
 | 前端首页 | 200，页面包含“云舟知识库助手” |
 | 后端 `/health` | 200 |
 | `/api/stats` | 200 |
-| 样例文档 | 8 份 |
-| Ready 文档 | 8 份 |
-| 分块数 | 36 |
-| 评测集 | 37 条 |
-| Hybrid + Rerank 评测 | 检索命中率 1.00，拒答准确率 1.00，关键词覆盖 1.00 |
+| 样例文档 | 11 份，覆盖 Markdown、TXT、DOCX、PDF |
+| Ready 文档 | 本地纯净验证 11 份；线上以 `/api/stats` 为准 |
+| 分块数 | 本地纯净验证 57；线上以 `/api/stats` 为准 |
+| 评测集 | 73 条 |
+| Hybrid + Rerank 评测 | 本地纯净验证：检索命中率 1.00，拒答准确率 1.00，关键词覆盖 1.00 |
 
 ## 2. 常用维护命令
 
@@ -94,7 +94,7 @@ docker compose run --rm \
 当前上线评测结果：
 
 ```text
-total: 37
+total: 73
 retrieval_mode: hybrid+rerank
 retrieval_hit_rate: 1.00
 refusal_accuracy: 1.00
@@ -172,4 +172,4 @@ iptables -S DOCKER-USER
 
 可以这样讲部署和运维部分：
 
-> 我已经把项目部署到一台 2 核 4GB 的云服务器上，使用 Docker Compose 编排 PostgreSQL、FastAPI 和 Next.js，用 Nginx 做公网反向代理。数据库、后端和前端容器端口只监听本机地址，公网只开放 80/443，避免 PostgreSQL 直接暴露。上线后我导入了 8 份虚构企业样例文档，并用 37 条 golden QA 跑了 Hybrid + Rerank 评测，检索命中率、拒答准确率和关键词覆盖都达到 1.00。
+> 我已经把项目部署到一台 2 核 4GB 的云服务器上，使用 Docker Compose 编排 PostgreSQL、FastAPI 和 Next.js，用 Nginx 做公网反向代理。数据库、后端和前端容器端口只监听本机地址，公网只开放 80/443，避免 PostgreSQL 直接暴露。样例知识库覆盖 Markdown、TXT、DOCX、PDF 多种文档格式，并通过 golden QA 评测验证检索命中、拒答和关键词覆盖。

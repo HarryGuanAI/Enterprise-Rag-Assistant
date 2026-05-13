@@ -247,8 +247,9 @@ docker compose run --rm \
 - Docker Compose 端口只绑定 `127.0.0.1`，避免公网直连容器端口。
 - UFW 只放行 `22`、`80`、`443`。
 - 额外通过 Docker `DOCKER-USER` 链阻断公网直连 `3000`、`8000`、`5432`。
-- 导入 8 份 `sample_docs/` 虚构文档，生成 36 个 chunks。
-- 运行 37 条 golden QA，Hybrid + Rerank 模式下检索命中率、拒答准确率、关键词覆盖均为 `1.00`。
+- 初始上线导入 8 份 `sample_docs/` 虚构文档，生成 36 个 chunks。
+- 当前样例资料已升级为 11 份虚构企业制度文档，覆盖 Markdown、TXT、DOCX、PDF；本地纯净验证生成 57 个 chunks。
+- 当前评测集已扩展到 73 条 golden QA，覆盖制度细则、例外场景、金额阈值、审批链路和拒答问题；Hybrid + Rerank 本地纯净验证三项指标均为 `1.00`。
 
 上线后常用维护命令见 [运维维护手册](maintenance.md)。
 
