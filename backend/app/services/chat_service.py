@@ -54,6 +54,64 @@ _QUESTION_STOP_TERMS = {
     "多少",
     "多久",
 }
+_DOMAIN_SUPPORT_TERMS = {
+    "入职",
+    "转正",
+    "离职",
+    "试用期",
+    "考勤",
+    "补卡",
+    "远程",
+    "外勤",
+    "年假",
+    "病假",
+    "婚假",
+    "调休",
+    "报销",
+    "差旅",
+    "住宿",
+    "餐补",
+    "发票",
+    "审批",
+    "招待",
+    "礼品",
+    "合同",
+    "报价",
+    "折扣",
+    "用印",
+    "回款",
+    "采购",
+    "供应商",
+    "付款",
+    "预付款",
+    "黑名单",
+    "工单",
+    "客服",
+    "响应",
+    "研发",
+    "日志",
+    "发布",
+    "故障",
+    "复盘",
+    "灰度",
+    "回滚",
+    "数据",
+    "权限",
+    "密钥",
+    "脱敏",
+    "薪酬",
+    "绩效",
+    "工资",
+    "奖金",
+    "福利",
+    "培训",
+    "预算",
+    "格式",
+    "文档",
+    "引用",
+    "游客",
+    "管理员",
+}
 
 
 def sse_event(event: str, data: dict) -> dict[str, str]:
@@ -432,7 +490,15 @@ def _has_current_question_support(
         return True
 
     haystack = "\n".join(f"{chunk.title}\n{chunk.section or ''}\n{chunk.content}" for chunk in chunks).lower()
-    return any(term in haystack for term in terms)
+    if any(term in haystack for term in terms):
+        return True
+
+    # 兜底处理“薪酬绩效”和“绩效薪酬”这类中文词序变化：
+    # 连续 n-gram 可能因为顺序不同未命中，但制度领域关键词已经共同出现时，应认为候选片段可支撑当前问题。
+    domain_terms = [term for term in _DOMAIN_SUPPORT_TERMS if term in question and term in haystack]
+    if len(domain_terms) >= 2:
+        return True
+    return len(domain_terms) == 1 and len(terms) <= 3
 
 
 def _retrieval_refusal_reason(

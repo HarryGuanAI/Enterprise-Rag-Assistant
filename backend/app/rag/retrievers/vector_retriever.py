@@ -34,6 +34,64 @@ class RetrievalStats:
 _ASCII_WORD_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{1,}")
 _CJK_TEXT_RE = re.compile(r"[\u4e00-\u9fff]+")
 _CJK_STOP_CHARS = set("的是了和与及或在对中为把被有无吗呢哪些什么如何怎么需要是否可以一个")
+_DOMAIN_SUPPORT_TERMS = {
+    "入职",
+    "转正",
+    "离职",
+    "试用期",
+    "考勤",
+    "补卡",
+    "远程",
+    "外勤",
+    "年假",
+    "病假",
+    "婚假",
+    "调休",
+    "报销",
+    "差旅",
+    "住宿",
+    "餐补",
+    "发票",
+    "审批",
+    "招待",
+    "礼品",
+    "合同",
+    "报价",
+    "折扣",
+    "用印",
+    "回款",
+    "采购",
+    "供应商",
+    "付款",
+    "预付款",
+    "黑名单",
+    "工单",
+    "客服",
+    "响应",
+    "研发",
+    "日志",
+    "发布",
+    "故障",
+    "复盘",
+    "灰度",
+    "回滚",
+    "数据",
+    "权限",
+    "密钥",
+    "脱敏",
+    "薪酬",
+    "绩效",
+    "工资",
+    "奖金",
+    "福利",
+    "培训",
+    "预算",
+    "格式",
+    "文档",
+    "引用",
+    "游客",
+    "管理员",
+}
 
 
 class PgVectorRetriever:
@@ -258,9 +316,18 @@ class PgVectorRetriever:
                     content=chunk.content,
                 ),
             )
+            domain_score = _domain_overlap_score(
+                query_text=query_text,
+                title=chunk.title,
+                section=chunk.section,
+                content=chunk.content,
+            )
+            keyword_score = max(keyword_score, domain_score)
             rerank_score = _clamp01(0.82 * chunk.score + 0.18 * keyword_score)
             if chunk.vector_score > 0 and keyword_score > 0:
                 rerank_score = _clamp01(rerank_score + 0.03)
+            if domain_score >= 0.8 and chunk.vector_score >= 0.5:
+                rerank_score = max(rerank_score, 0.62)
             # Rerank 只改变排序和小幅加权，不降低向量召回已有的置信度，避免阈值校准被精排阶段破坏。
             rerank_score = max(rerank_score, chunk.score, chunk.vector_score)
             reranked.append(
@@ -341,6 +408,31 @@ def _keyword_score(
         raw_score += max_score * 0.35
 
     return _clamp01(raw_score / max(max_score * 0.55, 1.0))
+
+
+def _domain_overlap_score(
+    *,
+    query_text: str,
+    title: str,
+    section: str | None,
+    content: str,
+) -> float:
+    """处理企业制度常见的词序变化，例如“薪酬绩效”和“绩效薪酬”."""
+    normalized_query = re.sub(r"\s+", "", query_text.strip().lower())
+    if not normalized_query:
+        return 0.0
+
+    haystack = f"{title}\n{section or ''}\n{content}".lower()
+    query_terms = [term for term in _DOMAIN_SUPPORT_TERMS if term in normalized_query]
+    if not query_terms:
+        return 0.0
+
+    hits = [term for term in query_terms if term in haystack]
+    if len(hits) >= 2:
+        return 0.9
+    if len(hits) == 1 and len(query_terms) == 1:
+        return 0.55
+    return 0.0
 
 
 def _clamp01(value: float) -> float:
